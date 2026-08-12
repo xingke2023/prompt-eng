@@ -157,7 +157,8 @@ QCZH_SYSTEM = """你是专业的影视导演和分镜脚本师，精通中国古
 }
 ```
 
-严格输出 JSON，不要其他内容。转折点镜头是最重要的，设计时要大胆，与前序镜头形成强烈反差。"""
+严格输出 JSON，不要其他内容。转折点镜头是最重要的，设计时要大胆，与前序镜头形成强烈反差。
+重要：所有字符串值内禁止使用英文双引号 "，需引用时请改用 「」或（）。"""
 
 STORYBOARD_SYSTEM = """你是专业的影视导演和分镜脚本师，同时精通 Seedance 视频生成提示词。
 
@@ -210,7 +211,8 @@ STORYBOARD_SYSTEM = """你是专业的影视导演和分镜脚本师，同时精
       "last_frame": "推进至中景，人物居中，背景虚化"
     }
   ]
-}"""
+}
+重要：字符串值内禁止使用英文双引号 "，需引用时请改用 「」或（）。"""
 
 
 ENHANCE_SYSTEM = """你是 Seedance 视频提示词优化专家，掌握专业分镜语言。
@@ -231,7 +233,8 @@ ENHANCE_SYSTEM = """你是 Seedance 视频提示词优化专家，掌握专业�
   "composition": "使用的构图法则",
   "shot_type": "景别",
   "camera_move": "镜头运动"
-}"""
+}
+重要：字符串值内禁止使用英文双引号 "，需引用时请改用 「」或（）。"""
 
 
 # ── Case Narration System Prompt ──────────────────────────────────────────────
@@ -314,18 +317,20 @@ NARRATION_SYSTEM = """你是专业的港险科普/叙事短视频导演，擅长
   "shots": [...]
 }
 ```
-只输出合法JSON，不包含任何```标记。"""
+只输出合法JSON，不包含任何```标记。
+重要：字符串值内禁止使用英文双引号 "，需引用时请改用 「」或（）。"""
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def parse_json_response(text):
     text = text.strip()
-    # Strip markdown code fences
-    if text.startswith("```"):
-        text = re.sub(r'^```(?:json)?\s*', '', text)
-        text = re.sub(r'\s*```\s*$', '', text)
-    text = text.strip()
+
+    # Extract the outermost JSON object regardless of surrounding text/fences
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end > start:
+        text = text[start:end + 1]
 
     # First attempt: parse as-is
     try:
@@ -334,7 +339,6 @@ def parse_json_response(text):
         pass
 
     # Repair: escape raw control characters inside string values
-    # using a simple state machine (handles newlines/tabs in narration_script etc.)
     repaired = []
     in_string = False
     escape_next = False
@@ -363,7 +367,7 @@ def parse_json_response(text):
     except json.JSONDecodeError:
         pass
 
-    # Last resort: also strip trailing commas before ] or }
+    # Last resort: strip trailing commas before ] or }
     fixed2 = re.sub(r',\s*([}\]])', r'\1', fixed)
     return json.loads(fixed2)
 
@@ -541,7 +545,7 @@ def generate_storyboard():
         client = get_client(api_key)
         response = client.messages.create(
             model=DEFAULT_MODEL,
-            max_tokens=4096,
+            max_tokens=8192,
             system=system_prompt,
             messages=[{"role": "user", "content": user_msg}],
         )
@@ -550,7 +554,9 @@ def generate_storyboard():
         try:
             storyboard = parse_json_response(response.content[0].text)
         except Exception as e:
-            return jsonify({"error": f"解析分镜结果失败：{str(e)}", "raw": response.content[0].text}), 500
+            raw = response.content[0].text
+            app.logger.error("Storyboard JSON parse failed: %s\nRaw (first 500): %s", e, raw[:500])
+            return jsonify({"error": f"解析分镜结果失败：{str(e)}", "raw": raw}), 500
 
         storyboard["narrative_structure"] = narrative_structure
         storyboard["video_type"] = video_type
