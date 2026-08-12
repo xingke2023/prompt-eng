@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import psycopg2
 import psycopg2.extras
@@ -320,12 +321,51 @@ NARRATION_SYSTEM = """你是专业的港险科普/叙事短视频导演，擅长
 
 def parse_json_response(text):
     text = text.strip()
+    # Strip markdown code fences
     if text.startswith("```"):
-        parts = text.split("```")
-        text = parts[1] if len(parts) > 1 else text
-        if text.startswith("json"):
-            text = text[4:]
-    return json.loads(text.strip())
+        text = re.sub(r'^```(?:json)?\s*', '', text)
+        text = re.sub(r'\s*```\s*$', '', text)
+    text = text.strip()
+
+    # First attempt: parse as-is
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Repair: escape raw control characters inside string values
+    # using a simple state machine (handles newlines/tabs in narration_script etc.)
+    repaired = []
+    in_string = False
+    escape_next = False
+    for ch in text:
+        if escape_next:
+            repaired.append(ch)
+            escape_next = False
+        elif ch == '\\':
+            repaired.append(ch)
+            escape_next = True
+        elif ch == '"':
+            in_string = not in_string
+            repaired.append(ch)
+        elif in_string and ch == '\n':
+            repaired.append('\\n')
+        elif in_string and ch == '\r':
+            repaired.append('\\r')
+        elif in_string and ch == '\t':
+            repaired.append('\\t')
+        else:
+            repaired.append(ch)
+    fixed = ''.join(repaired)
+
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort: also strip trailing commas before ] or }
+    fixed2 = re.sub(r',\s*([}\]])', r'\1', fixed)
+    return json.loads(fixed2)
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
