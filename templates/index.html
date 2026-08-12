@@ -881,16 +881,54 @@
             </select>
           </div>
           <div class="form-group">
+            <label>叙事结构</label>
+            <select id="sbStructure" onchange="onStructureChange()">
+              <option value="free">自由结构（AI 自由创作）</option>
+              <option value="qczh">起承转合（经典四段式叙事）</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>镜头数量</label>
             <select id="sbShotCount">
               <option value="3">3个镜头</option>
-              <option value="4">4个镜头</option>
+              <option value="4">4个镜头（起承转合推荐）</option>
               <option value="5" selected>5个镜头</option>
               <option value="6">6个镜头</option>
               <option value="8">8个镜头</option>
             </select>
           </div>
         </div>
+
+        <!-- 起承转合 说明面板 -->
+        <div id="qczhPanel" style="display:none;background:linear-gradient(135deg,rgba(108,99,255,.08),rgba(245,158,11,.06));border:1px solid rgba(108,99,255,.25);border-radius:12px;padding:16px 18px;margin:0 0 16px 0">
+          <div style="font-weight:600;font-size:13px;margin-bottom:12px;color:var(--text)">🏛️ 起承转合 — 四段叙事结构</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center">
+            <div style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:10px 6px">
+              <div style="font-size:22px;font-weight:800;color:#60a5fa">起</div>
+              <div style="font-size:11px;font-weight:600;color:#93c5fd;margin:2px 0">Opening</div>
+              <div style="font-size:11px;color:var(--text-muted)">建立场景<br>宽景引入</div>
+            </div>
+            <div style="background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 6px">
+              <div style="font-size:22px;font-weight:800;color:#34d399">承</div>
+              <div style="font-size:11px;font-weight:600;color:#6ee7b7;margin:2px 0">Development</div>
+              <div style="font-size:11px;color:var(--text-muted)">深入主体<br>情绪铺陈</div>
+            </div>
+            <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:10px 6px">
+              <div style="font-size:22px;font-weight:800;color:#fbbf24">转 ⚡</div>
+              <div style="font-size:11px;font-weight:600;color:#fcd34d;margin:2px 0">Pivot</div>
+              <div style="font-size:11px;color:var(--text-muted)">急转直下<br>强对比记忆点</div>
+            </div>
+            <div style="background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:10px 6px">
+              <div style="font-size:22px;font-weight:800;color:#a78bfa">合</div>
+              <div style="font-size:11px;font-weight:600;color:#c4b5fd;margin:2px 0">Resolution</div>
+              <div style="font-size:11px;color:var(--text-muted)">回应开篇<br>情绪升华</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+            💡 <strong style="color:var(--accent2)">转</strong> 是全片记忆点：镜头类型、光线、节奏须与 <strong style="color:#6ee7b7">承</strong> 形成强烈对比，制造视觉冲击。建议选 <strong>4个镜头</strong>（每阶段一个），或 8 个（每阶段两个）。
+          </div>
+        </div>
+
         <div class="actions">
           <button class="btn btn-primary" id="sbBtn" onclick="generateStoryboard()">
             <span>🎬 生成分镜脚本</span>
@@ -1496,6 +1534,11 @@ async function showSaveFragmentDialog() {
 
 // ── Storyboard ────────────────────────────────────────────────────────────────
 
+function onStructureChange() {
+  const v = document.getElementById('sbStructure').value;
+  document.getElementById('qczhPanel').style.display = v === 'qczh' ? 'block' : 'none';
+}
+
 async function generateStoryboard() {
   const btn = document.getElementById('sbBtn');
   const concept = document.getElementById('sbConcept').value.trim();
@@ -1508,12 +1551,13 @@ async function generateStoryboard() {
 
   const payload = {
     concept,
-    creative_goal:   document.getElementById('sbGoal').value,
-    target_audience: document.getElementById('sbAudience').value,
-    overall_tone:    document.getElementById('sbTone').value,
-    key_messages:    document.getElementById('sbMessages').value,
-    duration_total:  document.getElementById('sbDuration').value,
-    shot_count:      parseInt(document.getElementById('sbShotCount').value),
+    creative_goal:       document.getElementById('sbGoal').value,
+    target_audience:     document.getElementById('sbAudience').value,
+    overall_tone:        document.getElementById('sbTone').value,
+    key_messages:        document.getElementById('sbMessages').value,
+    duration_total:      document.getElementById('sbDuration').value,
+    shot_count:          parseInt(document.getElementById('sbShotCount').value),
+    narrative_structure: document.getElementById('sbStructure').value,
     api_key: apiKey
   };
 
@@ -1535,10 +1579,27 @@ async function generateStoryboard() {
 
 function renderStoryboard(sb, usage) {
   const tokens = usage ? `<span class="token-badge">↑${usage.input} ↓${usage.output} tokens</span>` : '';
-  const shots = (sb.shots || []).map((shot, i) => `
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px">
+  const isQczh = sb.narrative_structure === 'qczh';
+
+  const phaseConfig = {
+    '起': { color: '#60a5fa', bg: 'rgba(59,130,246,.13)', border: 'rgba(59,130,246,.35)', label: 'Opening' },
+    '承': { color: '#34d399', bg: 'rgba(16,185,129,.13)', border: 'rgba(16,185,129,.35)', label: 'Development' },
+    '转': { color: '#fbbf24', bg: 'rgba(245,158,11,.15)', border: 'rgba(245,158,11,.5)',  label: 'Pivot ⚡', highlight: true },
+    '合': { color: '#a78bfa', bg: 'rgba(139,92,246,.13)', border: 'rgba(139,92,246,.35)', label: 'Resolution' },
+  };
+
+  const shots = (sb.shots || []).map((shot, i) => {
+    const ph = isQczh && shot.phase ? phaseConfig[shot.phase] : null;
+    const cardBorder = ph ? `border:1.5px solid ${ph.border}` : 'border:1px solid var(--border)';
+    const cardBg = ph ? `background:${ph.bg}` : 'background:var(--surface2)';
+    const pivotBanner = ph && ph.highlight ? `<div style="background:rgba(245,158,11,.18);border-left:3px solid #fbbf24;padding:5px 10px;border-radius:0 6px 6px 0;font-size:11px;font-weight:600;color:#fcd34d;margin-bottom:8px">⚡ 记忆点 — 此镜头需与上一镜头形成强烈视觉对比</div>` : '';
+    const phaseBadge = ph ? `<div style="background:${ph.color};color:#000;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:800;letter-spacing:.5px">${shot.phase}</div><span style="font-size:11px;color:${ph.color};font-weight:600">${ph.label}</span>` : '';
+    return `
+    <div style="${cardBg};${cardBorder};border-radius:10px;padding:16px;margin-bottom:12px">
+      ${pivotBanner}
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <div style="background:var(--accent);color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">镜头 ${shot.shot_number}</div>
+        ${phaseBadge}
         <span style="font-size:12px;color:var(--text-muted)">${escHtml(shot.shot_type||'')} · ${escHtml(shot.duration||'')}</span>
         <span style="font-size:12px;color:var(--accent2)">${escHtml(shot.camera_move||'')}</span>
         <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">${escHtml(shot.composition||'')}</span>
@@ -1554,12 +1615,23 @@ function renderStoryboard(sb, usage) {
         <button class="btn btn-ghost btn-sm" onclick="saveFavorite('${escAttr(shot.prompt_en||'')}', ['分镜脚本','镜头${shot.shot_number}'])">⭐ 收藏</button>
       </div>
     </div>
-  `).join('');
+  `;}).join('');
+
+  const qczhSummary = isQczh && sb.phase_breakdown ? `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+      ${['起','承','转','合'].map(p => {
+        const info = sb.phase_breakdown[p] || {};
+        const cfg = phaseConfig[p];
+        return `<div style="background:${cfg.bg};border:1px solid ${cfg.border};border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:18px;font-weight:800;color:${cfg.color}">${p}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${escHtml(info.role_zh||cfg.label)}</div>
+        </div>`;}).join('')}
+    </div>` : '';
 
   document.getElementById('sbOutput').innerHTML = `
     <div class="output-card">
       <div class="output-header">
-        <div class="output-title">🎬 ${escHtml(sb.title||'分镜脚本')} ${tokens}</div>
+        <div class="output-title">🎬 ${escHtml(sb.title||'分镜脚本')} ${isQczh?'<span style="background:rgba(108,99,255,.2);color:var(--accent);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600">起承转合</span>':''} ${tokens}</div>
         <button class="btn btn-secondary btn-sm" onclick="exportStoryboard()">导出全部提示词</button>
       </div>
       <div class="output-body">
@@ -1567,6 +1639,7 @@ function renderStoryboard(sb, usage) {
           <strong>叙事思路：</strong>${escHtml(sb.narrative_summary||'')}
           <span style="margin-left:12px;color:var(--text-muted)">总时长：${escHtml(sb.total_duration||'')}</span>
         </div>
+        ${qczhSummary}
         ${shots}
       </div>
     </div>`;

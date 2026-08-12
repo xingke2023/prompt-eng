@@ -75,6 +75,84 @@ SINGLE_SHOT_SYSTEM = """你是专业的 Seedance 视频提示词专家，精通�
 （逗号分隔）"""
 
 
+QCZH_SYSTEM = """你是专业的影视导演和分镜脚本师，精通中国古典叙事结构**起承转合**，同时掌握 Seedance 视频提示词。
+
+## 起承转合四段结构
+
+### 起（Opening）— 建立，蓄势
+- **镜头任务**：交代时间/地点/主体，情绪中性，观众在问"这是哪里？这是谁？"
+- **镜头语言**：大景别（WS/EWS），固定或缓慢升/拉，主体小
+- **构图**：三分法，主体偏角，留大量环境空间
+- **节奏**：慢，呼吸感，不急于展示
+- **时长**：4-6s
+
+### 承（Development）— 推进，投入
+- **镜头任务**：跟近主体，展开行动/细节，建立情感投入，观众开始在意
+- **镜头语言**：景别推进（MS/MCU），跟拍或推镜，主体变大
+- **构图**：三分法或框中框，比"起"更亲近
+- **节奏**：有运动感，有温度
+- **时长**：4-6s
+
+### 转（Turn）— 转折，记忆点 ⚡ 最关键
+- **镜头任务**：打破前面建立的情绪节奏，制造意外/反转/揭示，这是全片记忆点
+- **原则**：与"承"形成强烈对比——景别相反（承是MCU则转用EWS）、情绪相反、光线相反
+- **镜头语言**：极端景别（ECU或EWS）、突然静止或突然运动、视角颠覆
+- **构图**：故意打破之前的构图规则
+- **节奏**：节拍感强，冲击力
+- **时长**：2-4s（短促有力）
+
+### 合（Resolution）— 收束，余韵
+- **镜头任务**：呼应"起"的构图，但含义已完全不同；留白，让观众自己填满情感
+- **原则**："形回意不回"——画面回到起的格局，但观众心境已变
+- **镜头语言**：回到大景别，缓慢淡出或静止定格
+- **构图**：刻意呼应"起"的构图
+- **节奏**：渐慢，留空
+- **时长**：5-8s
+
+---
+
+## 每个镜头输出字段
+
+```json
+{
+  "shot_number": 1,
+  "phase": "起",           // 起 / 承 / 转 / 合
+  "phase_en": "Opening",  // Opening / Development / Turn / Resolution
+  "phase_role": "建立场景，交代环境与主体",  // 这个镜头在叙事中的具体任务
+  "duration": "5s",
+  "shot_type": "WS",
+  "camera_move": "slow pull back",
+  "composition": "rule of thirds, subject small in frame",
+  "lighting": "...",
+  "color_tone": "...",
+  "description_zh": "一句话说明",
+  "prompt_en": "完整英文提示词（50-120词）",
+  "first_frame": "首帧中文描述",
+  "last_frame": "末帧中文描述",
+  "contrast_with": ""  // 仅"转"填写：与哪个前序镜头形成对比，如何对比
+}
+```
+
+## 总体输出 JSON
+
+```json
+{
+  "title": "脚本标题",
+  "narrative_structure": "起承转合",
+  "total_duration": "约XX秒",
+  "narrative_summary": "叙事思路（重点解释转折点的设计）",
+  "phase_breakdown": {
+    "起": "第1-X镜：...",
+    "承": "第X-X镜：...",
+    "转": "第X镜：...",
+    "合": "第X-X镜：..."
+  },
+  "shots": [ ... ]
+}
+```
+
+严格输出 JSON，不要其他内容。转折点镜头是最重要的，设计时要大胆，与前序镜头形成强烈反差。"""
+
 STORYBOARD_SYSTEM = """你是专业的影视导演和分镜脚本师，同时精通 Seedance 视频生成提示词。
 
 根据用户的视频创作需求，生成完整的多镜头分镜脚本。每个镜头都包含可直接用于 Seedance 的英文提示词。
@@ -298,20 +376,20 @@ def enhance_prompt():
 
 @app.route("/api/storyboard", methods=["POST"])
 def generate_storyboard():
-    """生成多镜头分镜脚本（参考 Storyboard Studio 的分镜结构）"""
     data = request.json
     api_key = data.get("api_key", "") or ANTHROPIC_API_KEY
     if not api_key:
         return jsonify({"error": "请在左侧填入 API Key"}), 400
 
-    concept         = data.get("concept", "").strip()
-    creative_goal   = data.get("creative_goal", "").strip()
-    target_audience = data.get("target_audience", "").strip()
-    overall_tone    = data.get("overall_tone", "").strip()
-    key_messages    = data.get("key_messages", "").strip()
-    shot_count      = data.get("shot_count", 5)
-    duration_total  = data.get("duration_total", "").strip()
-    project_name    = data.get("project_name", "").strip()
+    concept              = data.get("concept", "").strip()
+    creative_goal        = data.get("creative_goal", "").strip()
+    target_audience      = data.get("target_audience", "").strip()
+    overall_tone         = data.get("overall_tone", "").strip()
+    key_messages         = data.get("key_messages", "").strip()
+    shot_count           = data.get("shot_count", 5)
+    duration_total       = data.get("duration_total", "").strip()
+    project_name         = data.get("project_name", "").strip()
+    narrative_structure  = data.get("narrative_structure", "free")  # "free" | "qczh"
 
     if not concept:
         return jsonify({"error": "请输入视频概念描述"}), 400
@@ -322,15 +400,25 @@ def generate_storyboard():
     if overall_tone:    parts.append(f"整体基调：{overall_tone}")
     if key_messages:    parts.append(f"核心信息：{key_messages}")
     if duration_total:  parts.append(f"总时长：{duration_total}")
-    parts.append(f"镜头数量：{shot_count}个镜头")
+
+    if narrative_structure == "qczh":
+        # 起承转合：镜头数固定逻辑 起1-2 承1-2 转1 合1-2
+        qczh_count = max(4, int(shot_count))
+        parts.append(f"总镜头数：{qczh_count}个（按起承转合四段分配，其中'转'只有1个镜头）")
+        system_prompt = QCZH_SYSTEM
+        user_msg = "请用起承转合结构生成分镜脚本：\n\n" + "\n".join(parts)
+    else:
+        parts.append(f"镜头数量：{shot_count}个镜头")
+        system_prompt = STORYBOARD_SYSTEM
+        user_msg = "\n".join(parts)
 
     try:
         client = get_client(api_key)
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=4096,
-            system=STORYBOARD_SYSTEM,
-            messages=[{"role": "user", "content": "\n".join(parts)}],
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}],
         )
         tokens_in, tokens_out = response.usage.input_tokens, response.usage.output_tokens
 
@@ -339,18 +427,21 @@ def generate_storyboard():
         except Exception as e:
             return jsonify({"error": f"解析分镜结果失败：{str(e)}", "raw": response.content[0].text}), 500
 
+        storyboard["narrative_structure"] = narrative_structure
+
         try:
             with get_db() as conn, conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO storyboards
                         (project_name, creative_goal, target_audience, overall_tone,
-                         key_messages, duration_total, raw_input, shots, tokens_in, tokens_out)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                         key_messages, duration_total, raw_input, shots,
+                         narrative_structure, tokens_in, tokens_out)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
                 """, (project_name or storyboard.get("title", ""),
                       creative_goal, target_audience, overall_tone,
                       key_messages, storyboard.get("total_duration", duration_total),
                       concept, json.dumps(storyboard.get("shots", []), ensure_ascii=False),
-                      tokens_in, tokens_out))
+                      narrative_structure, tokens_in, tokens_out))
                 sb_id = cur.fetchone()[0]
         except Exception as e:
             sb_id = None
