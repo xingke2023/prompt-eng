@@ -233,6 +233,73 @@ ENHANCE_SYSTEM = """你是 Seedance 视频提示词优化专家，掌握专业�
 }"""
 
 
+# ── Case Narration System Prompt ──────────────────────────────────────────────
+
+NARRATION_SYSTEM = """你是专业的港险科普/叙事短视频导演，擅长将保险案例转化为旁白解说式视频脚本。
+
+## 视频风格：旁白解说 + B-roll画面（非短剧）
+- 全程旁白配音，观众听声音、看画面，无演员扮演对话
+- 画面是旁白的"视觉注解"——抽象概念用具体画面表达
+- 每个镜头预留下三分之一空间给字幕（避免重要视觉元素出现在画面底部）
+- 适合抖音/视频号/微信，横屏16:9
+
+## 旁白完整性要求（核心原则）
+旁白必须完整讲述整个案例或话题，让观众听完就能完全理解：
+- **不能跳过关键信息**：客户背景、面临的问题/风险、保险方案细节（险种/金额/保额）、最终结果或结论
+- **每个镜头的旁白是全片旁白的一部分**，所有镜头的旁白合在一起必须形成完整叙事
+- **narration_script 是最终成品脚本**，不是提示或摘要，要可以直接交给配音员逐字朗读
+- 按正常语速（每秒3.5-4字）估算，每个镜头的旁白字数要匹配该镜头时长
+- 数据、金额、年龄、险种名称等具体信息一定要包含在旁白中
+
+## 可用的画面类型（B-roll）
+- 城市建立镜头：香港天际线、摩天大楼、IFC、金融街人流
+- 家庭场景：父母陪孩子、全家聚餐、送孩子上学、家人散步
+- 财富/资产：文件签署特写、钱包/现金/美元、房产证/保单
+- 情绪隐喻：阴云→阳光穿透（危机→化解）、雨伞（保护）、坚固城堡（防线）
+- 人物B-roll：白领走进写字楼、医院走廊、医生问诊（侧面/背面，非正脸扮演）
+- 时间流逝：日历翻页延时、城市日落、婴儿→老人的渐进蒙太奇
+- 细节特写：保险合同盖章、计算器数字、手机APP截面（模糊处理）
+
+## 每个镜头输出字段
+```json
+{
+  "shot_number": 1,
+  "duration": "8s",
+  "shot_type": "wide shot",
+  "camera_move": "slow push in",
+  "composition": "rule of thirds, lower third clear for subtitles",
+  "lighting": "...",
+  "color_tone": "...",
+  "description_zh": "画面内容说明（简洁）",
+  "narration_script": "此镜头的完整旁白（最终成品，可直接配音）。字数要与镜头时长匹配（5s≈18-20字，8s≈28-32字，10s≈35-40字）。语言自然流畅，不念生硬词汇。",
+  "subtitle_text": "屏幕叠加的关键词/核心数据（简短有力，可空）",
+  "prompt_en": "完整英文提示词50-100词",
+  "first_frame": "首帧画面描述",
+  "last_frame": "末帧画面描述"
+}
+```
+
+## 叙事节奏（5-6镜头参考，确保案例讲清楚）
+1. **引入钩子**（8s）：一个有冲击力的问题或数据，直击目标受众痛点
+2. **人物/背景**（8s）：介绍当事人情况——年龄、职业、家庭、当时的处境
+3. **问题/风险**（8s）：具体风险暴露，说清楚"不保会怎样"
+4. **方案/解法**（10s）：港险具体方案——险种、保额、保费、优势，数据说话
+5. **结果/验证**（8s）：案例结局或实际效益，给出结论
+6. **升华/行动**（8s）：情感收尾，留下思考，CTA（可选）
+
+## 输出格式（严格JSON，禁止Markdown代码块）
+```json
+{
+  "title": "视频标题（适合作为短视频标题）",
+  "narrative_summary": "一句话说明整体解说逻辑",
+  "total_duration": "总时长估算",
+  "video_type": "narration",
+  "shots": [...]
+}
+```
+只输出合法JSON，不包含任何```标记。"""
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def parse_json_response(text):
@@ -388,6 +455,7 @@ def generate_storyboard():
     duration_total       = data.get("duration_total", "").strip()
     project_name         = data.get("project_name", "").strip()
     narrative_structure  = data.get("narrative_structure", "free")  # "free" | "qczh"
+    video_type           = data.get("video_type", "story")           # "story" | "narration"
 
     if not concept:
         return jsonify({"error": "请输入视频概念描述"}), 400
@@ -399,8 +467,11 @@ def generate_storyboard():
     if key_messages:    parts.append(f"核心信息：{key_messages}")
     if duration_total:  parts.append(f"总时长：{duration_total}")
 
-    if narrative_structure == "qczh":
-        # 起承转合：镜头数固定逻辑 起1-2 承1-2 转1 合1-2
+    if video_type == "narration":
+        parts.append(f"镜头数量：{shot_count}个镜头")
+        system_prompt = NARRATION_SYSTEM
+        user_msg = "请用旁白解说风格生成分镜脚本：\n\n" + "\n".join(parts)
+    elif narrative_structure == "qczh":
         qczh_count = max(4, int(shot_count))
         parts.append(f"总镜头数：{qczh_count}个（按起承转合四段分配，其中'转'只有1个镜头）")
         system_prompt = QCZH_SYSTEM
@@ -426,6 +497,7 @@ def generate_storyboard():
             return jsonify({"error": f"解析分镜结果失败：{str(e)}", "raw": response.content[0].text}), 500
 
         storyboard["narrative_structure"] = narrative_structure
+        storyboard["video_type"] = video_type
 
         try:
             with get_db() as conn, conn.cursor() as cur:
@@ -439,7 +511,7 @@ def generate_storyboard():
                       creative_goal, target_audience, overall_tone,
                       key_messages, storyboard.get("total_duration", duration_total),
                       concept, json.dumps(storyboard.get("shots", []), ensure_ascii=False),
-                      narrative_structure, tokens_in, tokens_out))
+                      f"{narrative_structure}/{video_type}", tokens_in, tokens_out))
                 sb_id = cur.fetchone()[0]
         except Exception as e:
             sb_id = None

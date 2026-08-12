@@ -884,6 +884,13 @@
             </select>
           </div>
           <div class="form-group">
+            <label>视频类型</label>
+            <select id="sbVideoType" onchange="onVideoTypeChange()">
+              <option value="story">叙事短片（画面驱动叙事）</option>
+              <option value="narration">解说纪录片（旁白+字幕+B-roll）</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>叙事结构</label>
             <select id="sbStructure" onchange="onStructureChange()">
               <option value="free">自由结构（AI 自由创作）</option>
@@ -929,6 +936,24 @@
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
             💡 <strong style="color:var(--accent2)">转</strong> 是全片记忆点：镜头类型、光线、节奏须与 <strong style="color:#6ee7b7">承</strong> 形成强烈对比，制造视觉冲击。建议选 <strong>4个镜头</strong>（每阶段一个），或 8 个（每阶段两个）。
+          </div>
+        </div>
+
+        <!-- 解说纪录片 说明面板 -->
+        <div id="narrationPanel" style="display:none;background:linear-gradient(135deg,rgba(16,185,129,.06),rgba(59,130,246,.06));border:1px solid rgba(16,185,129,.25);border-radius:12px;padding:16px 18px;margin:0 0 16px 0">
+          <div style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text)">🎙️ 解说纪录片模式 — 旁白 + B-roll + 字幕</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;color:var(--text-muted)">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px">
+              <div style="color:var(--success);font-weight:600;margin-bottom:4px">✅ 适合</div>
+              港险案例科普 / 知识解说 / 产品介绍<br>每镜头附带旁白提示和字幕建议
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px">
+              <div style="color:var(--error);font-weight:600;margin-bottom:4px">❌ 不包含</div>
+              演员扮演角色 / 对话剧情 / 人物独白<br>画面全程为 B-roll 配合旁白
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+            💡 生成后每个镜头会标注：<strong style="color:var(--accent2)">旁白内容</strong>（告诉配音说什么）+ <strong style="color:var(--success)">字幕文字</strong>（叠加到画面的关键词）
           </div>
         </div>
 
@@ -1562,6 +1587,15 @@ function onStructureChange() {
   document.getElementById('qczhPanel').style.display = v === 'qczh' ? 'block' : 'none';
 }
 
+function onVideoTypeChange() {
+  const v = document.getElementById('sbVideoType').value;
+  document.getElementById('narrationPanel').style.display = v === 'narration' ? 'block' : 'none';
+  // narration mode uses its own 5-step structure, hide qczh structure selector
+  const structureGroup = document.getElementById('sbStructure').closest('.form-group');
+  structureGroup.style.display = v === 'narration' ? 'none' : '';
+  document.getElementById('qczhPanel').style.display = 'none';
+}
+
 async function generateStoryboard() {
   const btn = document.getElementById('sbBtn');
   const concept = document.getElementById('sbConcept').value.trim();
@@ -1580,6 +1614,7 @@ async function generateStoryboard() {
     duration_total:      document.getElementById('sbDuration').value,
     shot_count:          parseInt(document.getElementById('sbShotCount').value),
     narrative_structure: document.getElementById('sbStructure').value,
+    video_type:          document.getElementById('sbVideoType').value,
     api_key: apiKey
   };
 
@@ -1632,6 +1667,11 @@ function renderStoryboard(sb, usage) {
         <div><strong style="color:var(--text)">末帧：</strong>${escHtml(shot.last_frame||'')}</div>
       </div>
       <div style="background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);border-radius:6px;padding:10px;font-family:monospace;font-size:12px;color:#c4b5fd;line-height:1.7;margin-bottom:8px">${escHtml(shot.prompt_en||'')}</div>
+      ${shot.narration_script ? `<div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.25);border-radius:6px;padding:11px 13px;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:#34d399;margin-bottom:6px;display:flex;align-items:center;gap:6px">🎙️ 旁白文本 <span style="font-weight:400;color:var(--text-muted);font-size:10px">（成品配音稿，可直接朗读）</span></div>
+        <div style="font-size:13px;line-height:1.8;color:var(--text)">${escHtml(shot.narration_script)}</div>
+        ${shot.subtitle_text ? `<div style="margin-top:8px;padding-top:7px;border-top:1px solid rgba(16,185,129,.2)"><span style="background:rgba(245,158,11,.18);color:#fbbf24;border-radius:5px;padding:2px 10px;font-size:12px;font-weight:600">📌 字幕：${escHtml(shot.subtitle_text)}</span></div>` : ''}
+      </div>` : ''}
       <div style="display:flex;gap:6px">
         <button class="btn btn-secondary btn-sm" onclick="copyText(this,'${escAttr(shot.prompt_en||'')}')">复制提示词</button>
         <button class="btn btn-ghost btn-sm" onclick="saveFavorite('${escAttr(shot.prompt_en||'')}', ['分镜脚本','镜头${shot.shot_number}'])">⭐ 收藏</button>
@@ -1671,9 +1711,13 @@ function renderStoryboard(sb, usage) {
 function exportStoryboard() {
   const sb = window._lastStoryboard;
   if (!sb) return;
-  const text = (sb.shots||[]).map(s =>
-    `=== 镜头 ${s.shot_number} [${s.shot_type} · ${s.duration}] ===\n${s.prompt_en}`
-  ).join('\n\n');
+  const text = (sb.shots||[]).map(s => {
+    let block = `=== 镜头 ${s.shot_number} [${s.shot_type} · ${s.duration}] ===\n`;
+    if (s.narration_script) block += `【旁白】${s.narration_script}\n`;
+    if (s.subtitle_text) block += `【字幕】${s.subtitle_text}\n`;
+    block += `【提示词】${s.prompt_en}`;
+    return block;
+  }).join('\n\n');
   navigator.clipboard.writeText(text).then(() => showToast('全部提示词已复制'));
 }
 
@@ -1862,12 +1906,12 @@ async function caseToStoryboard(caseId) {
     ].filter(Boolean).join('\n\n');
 
     document.getElementById('sbConcept').value = concept.slice(0, 600);
-    document.getElementById('sbGoal').value = 'brand storytelling, emotional connection';
-    document.getElementById('sbTone').value = 'cinematic and emotional';
+    document.getElementById('sbGoal').value = '完整讲述保险案例，科普港险知识，帮助受众了解方案价值';
+    document.getElementById('sbTone').value = '专业亲切，信任感强，娓娓道来';
     document.getElementById('sbMessages').value = kp.length ? kp.slice(0,3).join('、') : (c.budget_suggestion || c.title);
-    document.getElementById('sbStructure').value = 'qczh';
-    onStructureChange();
-    document.getElementById('sbShotCount').value = '4';
+    document.getElementById('sbVideoType').value = 'narration';
+    onVideoTypeChange();
+    document.getElementById('sbShotCount').value = '6';
     document.getElementById('sbAudience').value = c.family_structure || '高净值人士及家庭';
 
     switchPage('storyboard');
@@ -1887,12 +1931,12 @@ async function qaToStoryboard(qaId) {
 
     const concept = `${q.title}\n\n${(q.content||'').slice(0,400).replace(/#+\s*/g,'').replace(/\n{2,}/g,'\n')}`;
     document.getElementById('sbConcept').value = concept.slice(0, 600);
-    document.getElementById('sbGoal').value = 'brand storytelling, emotional connection';
-    document.getElementById('sbTone').value = 'cinematic and emotional';
+    document.getElementById('sbGoal').value = '完整科普这个港险话题，解答受众疑惑，建立专业信任感';
+    document.getElementById('sbTone').value = '专业亲切，逻辑清晰，娓娓道来';
     document.getElementById('sbMessages').value = q.title.slice(0, 80);
-    document.getElementById('sbStructure').value = 'qczh';
-    onStructureChange();
-    document.getElementById('sbShotCount').value = '4';
+    document.getElementById('sbVideoType').value = 'narration';
+    onVideoTypeChange();
+    document.getElementById('sbShotCount').value = '6';
     document.getElementById('sbAudience').value = '内地赴港投保客户';
 
     switchPage('storyboard');
