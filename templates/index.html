@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seedance 脚本生成器</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2d3148;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    /* Layout */
+    .app-wrapper {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+    /* Sidebar */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-header {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .logo-sub { font-size: 12px; color: var(--text-muted); }
+    .sidebar-nav {
+      padding: 16px 12px;
+      flex: 1;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+      transition: all .15s;
+      margin-bottom: 2px;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active { background: rgba(108,99,255,.15); color: var(--accent2); }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+    /* API Settings in sidebar */
+    .api-box {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .api-box label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 6px; }
+    .api-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .api-input:focus { outline: none; border-color: var(--accent); }
+    /* Main content */
+    .main {
+      display: flex;
+      flex-direction: column;
+    }
+    .main-header {
+      padding: 24px 32px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .main-header h1 { font-size: 18px; font-weight: 600; }
+    .main-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .content-area {
+      padding: 28px 32px;
+      flex: 1;
+    }
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      background: var(--surface);
+      padding: 4px;
+      border-radius: 10px;
+      width: fit-content;
+    }
+    .tab {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all .15s;
+      border: none;
+      background: none;
+    }
+    .tab.active { background: var(--surface2); color: var(--text); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    /* Form grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    label span { color: var(--error); margin-left: 2px; }
+    input[type="text"], textarea, select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+    select option { background: var(--surface2); }
+    /* Tag chips for quick select */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .chip {
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all .15s;
+      background: none;
+    }
+    .chip:hover { border-color: var(--accent2); color: var(--accent2); }
+    .chip.selected { background: rgba(108,99,255,.2); border-color: var(--accent); color: var(--accent2); }
+    /* Buttons */
+    .btn {
+      padding: 10px 22px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { background: #5b52e0; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent2); }
+    .btn-ghost { background: none; color: var(--text-muted); padding: 6px 12px; }
+    .btn-ghost:hover { color: var(--text); background: var(--surface2); }
+    .btn-sm { padding: 6px 14px; font-size: 12px; border-radius: 8px; }
+    .actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+    /* Output area */
+    .output-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-top: 24px;
+      overflow: hidden;
+    }
+    .output-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface2);
+    }
+    .output-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .output-body { padding: 20px; }
+    .prompt-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #c9d1d9;
+      min-height: 80px;
+    }
+    .prompt-box.enhanced {
+      border-color: var(--accent);
+      background: rgba(108,99,255,.05);
+    }
+    .explanation {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: rgba(16,185,129,.08);
+      border-left: 3px solid var(--success);
+      border-radius: 0 8px 8px 0;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .tags-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .tag {
+      padding: 3px 10px;
+      background: rgba(108,99,255,.15);
+      border: 1px solid rgba(108,99,255,.3);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--accent2);
+    }
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Examples grid */
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .example-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .example-card:hover { border-color: var(--accent2); transform: translateY(-2px); }
+    .example-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .example-title { font-size: 14px; font-weight: 600; }
+    .example-cat {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: rgba(108,99,255,.15);
+      color: var(--accent2);
+    }
+    .example-zh { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+    .example-prompt {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: monospace;
+      background: var(--bg);
+      padding: 10px;
+      border-radius: 6px;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      line-height: 1.6;
+    }
+    /* Guide section */
+    .guide-section { margin-bottom: 28px; }
+    .guide-section h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .guide-section h3::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .guide-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .guide-item .key { font-size: 11px; color: var(--accent2); font-weight: 600; margin-bottom: 4px; }
+    .guide-item .val { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+    /* Enhance tab */
+    .enhance-area { display: flex; flex-direction: column; gap: 16px; }
+    /* Alerts */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .alert-error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+    /* Token badge */
+    .token-badge {
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--surface2);
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1a2e1a;
+      border: 1px solid var(--success);
+      color: #6ee7b7;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all .3s;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-muted);
+      padding: 10px 12px 4px;
+      opacity: .6;
+    }
+    /* Library */
+    .lib-tabs { display:flex; gap:4px; margin-bottom:18px; flex-wrap:wrap; }
+    .lib-tab {
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+      font-size: 12px; cursor: pointer; color: var(--text-muted); background: none;
+      transition: all .15s;
+    }
+    .lib-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .lib-tab:hover:not(.active) { border-color: var(--accent2); color: var(--accent2); }
+    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .lib-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px; cursor: pointer; transition: all .15s; position: relative;
+    }
+    .lib-card:hover { border-color: var(--accent2); transform: translateY(-1px); }
+    .lib-card-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .lib-card-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+    .lib-card-fragment {
+      font-size: 11px; color: var(--accent2); font-family: monospace;
+      background: rgba(108,99,255,.08); border-radius: 5px; padding: 6px 8px;
+      overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .lib-card-meta { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+    .lib-badge {
+      font-size:10px; padding:2px 7px; border-radius:10px;
+      background:rgba(108,99,255,.12); color:var(--accent2);
+    }
+    .lib-card-actions { display:flex; gap:6px; margin-top:10px; }
+    /* History card */
+    .history-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .history-card:hover { border-color: var(--accent2); }
+    /* Responsive */
+    @media (max-width: 768px) {
+      .app-wrapper { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; }
+      .content-area { padding: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">Seedance Script</div>
+      <div class="logo-sub">AI 视频提示词生成器</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">创作</div>
+      <div class="nav-item active" onclick="switchPage('generate')">
+        <span class="nav-icon">✏️</span> 生成提示词
+      </div>
+      <div class="nav-item" onclick="switchPage('enhance')">
+        <span class="nav-icon">✨</span> 优化提示词
+      </div>
+      <div class="nav-item" onclick="switchPage('storyboard')">
+        <span class="nav-icon">🎬</span> 分镜脚本
+      </div>
+      <div class="nav-section-label">素材库</div>
+      <div class="nav-item" onclick="switchPage('library')">
+        <span class="nav-icon">📚</span> 素材库
+      </div>
+      <div class="nav-item" onclick="switchPage('examples')">
+        <span class="nav-icon">📁</span> 示例库
+      </div>
+      <div class="nav-item" onclick="switchPage('favorites')">
+        <span class="nav-icon">⭐</span> 收藏夹
+      </div>
+      <div class="nav-section-label">记录</div>
+      <div class="nav-item" onclick="switchPage('history')">
+        <span class="nav-icon">🕐</span> 历史记录
+      </div>
+      <div class="nav-item" onclick="switchPage('guide')">
+        <span class="nav-icon">📖</span> 提示词指南
+      </div>
+    </nav>
+    <div class="api-box">
+      <label>API Key (Claude)</label>
+      <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-..." />
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Page: Generate -->
+    <div id="page-generate" class="page">
+      <div class="main-header">
+        <h1>✏️ 生成 Seedance 提示词</h1>
+        <p>填写视频要素，AI 自动生成高质量的 Seedance 提示词</p>
+      </div>
+      <div class="content-area">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>主体描述 <span>*</span></label>
+            <input type="text" id="subject" placeholder="例：一位穿白衬衫的年轻女性，长发，微笑" />
+          </div>
+          <div class="form-group">
+            <label>动作/运动 <span>*</span></label>
+            <input type="text" id="action" placeholder="例：缓慢走过一片花田，发丝随风飘动" />
+          </div>
+          <div class="form-group">
+            <label>场景/环境</label>
+            <input type="text" id="scene" placeholder="例：日落时分的薰衣草田，远处是山脉" />
+          </div>
+          <div class="form-group">
+            <label>镜头语言</label>
+            <select id="camera">
+              <option value="">-- 选择镜头 --</option>
+              <optgroup label="运动方式">
+                <option value="static shot, locked-off camera">固定镜头</option>
+                <option value="slow push-in, camera drifts forward">推镜头（缓慢推进）</option>
+                <option value="slow pull back, camera retreats">拉镜头（缓慢后退）</option>
+                <option value="pan left">平移（向左）</option>
+                <option value="pan right">平移（向右）</option>
+                <option value="tracking shot following the subject">跟拍镜头</option>
+                <option value="slow orbital shot circling the subject">环绕镜头</option>
+                <option value="camera rises upward, crane shot">上升镜头</option>
+                <option value="camera descends, crane down">下降镜头</option>
+                <option value="handheld, slightly shaky, documentary feel">手持镜头</option>
+                <option value="aerial drone shot, bird's eye view">航拍俯视</option>
+              </optgroup>
+              <optgroup label="景别">
+                <option value="extreme close-up (ECU)">极致特写</option>
+                <option value="close-up (CU)">近特写</option>
+                <option value="medium close-up (MCU)">近景</option>
+                <option value="medium shot">中景</option>
+                <option value="wide shot">广角全景</option>
+                <option value="extreme wide shot, establishing shot">大远景</option>
+              </optgroup>
+              <optgroup label="视角">
+                <option value="low angle, looking upward">仰拍视角</option>
+                <option value="top-down view, overhead perspective">俯拍视角</option>
+                <option value="eye level, natural perspective">平视视角</option>
+                <option value="over-the-shoulder shot">过肩视角</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>视觉风格</label>
+            <select id="style">
+              <option value="">-- 选择风格 --</option>
+              <option value="cinematic, film grain, anamorphic lens">电影感</option>
+              <option value="photorealistic, documentary style">写实纪录片</option>
+              <option value="commercial advertisement style, polished">商业广告风</option>
+              <option value="vintage film, 35mm, warm tones, slightly faded">复古胶片</option>
+              <option value="high contrast, dramatic shadows, noir style">黑色电影风</option>
+              <option value="bright and airy, high key lighting, pastel tones">清新明亮</option>
+              <option value="dark and moody, atmospheric, low key">暗黑氛围</option>
+              <option value="3D animation, CGI, highly detailed">3D动画</option>
+              <option value="watercolor animation style, soft edges">水彩动画</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>光线/时间</label>
+            <select id="lighting">
+              <option value="">-- 选择光线 --</option>
+              <option value="golden hour sunlight, warm and soft">黄金时刻（日落前）</option>
+              <option value="blue hour, dusk, soft cool light">蓝调时刻（日落后）</option>
+              <option value="harsh midday sun, high contrast shadows">正午强光</option>
+              <option value="soft overcast daylight, diffused shadows">阴天散射光</option>
+              <option value="night scene, artificial lighting, neon reflections">夜景霓虹</option>
+              <option value="dawn, first light, misty atmosphere">清晨薄雾</option>
+              <option value="backlit silhouette, rim lighting">逆光剪影</option>
+              <option value="studio three-point lighting, clean">棚拍三点布光</option>
+              <option value="candlelight, warm flickering glow">烛光暖调</option>
+              <option value="moonlight, cold blue night light">月光冷调</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>氛围/情绪</label>
+            <div class="chips" id="moodChips">
+              <button class="chip" onclick="toggleChip(this, 'mood')">宁静 peaceful</button>
+              <button class="chip" onclick="toggleChip(this, 'mood')">史诗 epic</button>
+              <button class="chip" onclick="toggleChip(this, 'mood')">忧郁 melancholic</button>
+              <button class="chip" onclick="toggleChip(this, 'mood')">浪漫 romantic</button>
+              <button class="chip" onclick="toggleChip(this, 'mood')">神秘 mysterious</button>
+              <button class="chip" onclick="toggleChip(this, 'mood')">紧张 tense</button>
+              <button class="chip" onclick="toggleChip(this, 'mood')">梦幻 dreamlike</button>
+              <button class="chip" onclick="toggleChip(this, 'mood')">怀旧 nostalgic</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>质量词</label>
+            <div class="chips" id="qualityChips">
+              <button class="chip" onclick="toggleChip(this, 'quality')">8K ultra-detailed</button>
+              <button class="chip" onclick="toggleChip(this, 'quality')">photorealistic</button>
+              <button class="chip" onclick="toggleChip(this, 'quality')">shallow depth of field</button>
+              <button class="chip" onclick="toggleChip(this, 'quality')">bokeh background</button>
+              <button class="chip" onclick="toggleChip(this, 'quality')">slow motion</button>
+              <button class="chip" onclick="toggleChip(this, 'quality')">4K cinematic</button>
+            </div>
+          </div>
+          <div class="form-group full">
+            <label>补充描述（可选）</label>
+            <textarea id="extraDesc" placeholder="任何额外的细节、特殊要求..."></textarea>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="generateBtn" onclick="generatePrompt()">
+            <span>✨ 生成提示词</span>
+          </button>
+          <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+        </div>
+        <div id="generateOutput"></div>
+      </div>
+    </div>
+
+    <!-- Page: Enhance -->
+    <div id="page-enhance" class="page" style="display:none">
+      <div class="main-header">
+        <h1>✨ 优化提示词</h1>
+        <p>粘贴已有的粗糙提示词，AI 帮你补全细节、增强质量</p>
+      </div>
+      <div class="content-area">
+        <div class="enhance-area">
+          <div class="form-group">
+            <label>输入原始提示词</label>
+            <textarea id="rawPrompt" style="min-height: 120px;" placeholder="粘贴任意粗糙的提示词，例如：&#10;一个女孩在海边行走&#10;&#10;或英文：&#10;a girl walking on the beach"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" id="enhanceBtn" onclick="enhancePrompt()">
+              <span>✨ 优化提示词</span>
+            </button>
+          </div>
+          <div id="enhanceOutput"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page: Examples -->
+    <div id="page-examples" class="page" style="display:none">
+      <div class="main-header">
+        <h1>📁 提示词示例库</h1>
+        <p>点击示例卡片可直接使用</p>
+      </div>
+      <div class="content-area">
+        <div class="examples-grid" id="examplesGrid">
+          <div style="color:var(--text-muted);font-size:13px">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page: Guide -->
+    <div id="page-guide" class="page" style="display:none">
+      <div class="main-header">
+        <h1>📖 Seedance 提示词指南</h1>
+        <p>掌握高质量视频提示词的核心规则</p>
+      </div>
+      <div class="content-area">
+        <div class="guide-section">
+          <h3>📐 提示词结构</h3>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:13px;line-height:1.8;">
+            <div style="font-family:monospace;color:var(--accent2)">
+              [镜头语言] + [主体描述] + [动作/运动] + [场景/环境] + [光线氛围] + [视觉风格] + [质量词]
+            </div>
+            <div style="margin-top:12px;color:var(--text-muted)">
+              <strong style="color:var(--text)">示例：</strong><br>
+              <span style="font-family:monospace;color:#c9d1d9">
+                Slow push-in medium shot. A young woman in a white linen dress walks slowly through a lavender field at golden hour. Her hair flows gently in the warm breeze. Soft golden backlight creates a dreamy rim glow. Wide rolling hills in background. Cinematic, shallow depth of field, film grain, romantic and serene atmosphere.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3>🎬 镜头运动词汇</h3>
+          <div class="guide-grid">
+            <div class="guide-item"><div class="key">固定</div><div class="val">static shot / locked-off</div></div>
+            <div class="guide-item"><div class="key">推镜头</div><div class="val">slow push in / dolly in</div></div>
+            <div class="guide-item"><div class="key">拉镜头</div><div class="val">pull back / dolly out</div></div>
+            <div class="guide-item"><div class="key">平移</div><div class="val">pan left / pan right</div></div>
+            <div class="guide-item"><div class="key">跟拍</div><div class="val">tracking shot / follow cam</div></div>
+            <div class="guide-item"><div class="key">环绕</div><div class="val">orbital shot / 360 circle</div></div>
+            <div class="guide-item"><div class="key">上升</div><div class="val">crane up / camera rises</div></div>
+            <div class="guide-item"><div class="key">手持</div><div class="val">handheld / shaky cam</div></div>
+            <div class="guide-item"><div class="key">航拍</div><div class="val">aerial / drone shot / bird's eye</div></div>
+            <div class="guide-item"><div class="key">倾斜</div><div class="val">tilt up / tilt down</div></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3>🖼️ 景别词汇</h3>
+          <div class="guide-grid">
+            <div class="guide-item"><div class="key">极致特写</div><div class="val">extreme close-up (ECU)</div></div>
+            <div class="guide-item"><div class="key">特写</div><div class="val">close-up (CU)</div></div>
+            <div class="guide-item"><div class="key">近景</div><div class="val">medium close-up (MCU)</div></div>
+            <div class="guide-item"><div class="key">中景</div><div class="val">medium shot (MS)</div></div>
+            <div class="guide-item"><div class="key">全景</div><div class="val">wide shot / full shot</div></div>
+            <div class="guide-item"><div class="key">大远景</div><div class="val">extreme wide shot (EWS)</div></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3>💡 核心规则</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:12px">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">
+              <div style="font-weight:600;margin-bottom:6px;color:var(--success)">✅ 使用英文</div>
+              <div style="font-size:13px;color:var(--text-muted)">Seedance 对英文提示词响应更好，用词精准具体</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">
+              <div style="font-weight:600;margin-bottom:6px;color:var(--success)">✅ 具体胜于抽象</div>
+              <div style="font-size:13px;color:var(--text-muted)">❌ beautiful scene<br>✅ golden sunset over misty mountains</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">
+              <div style="font-weight:600;margin-bottom:6px;color:var(--success)">✅ 镜头描述放前面</div>
+              <div style="font-size:13px;color:var(--text-muted)">将镜头语言作为提示词的开头，模型响应更稳定</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">
+              <div style="font-weight:600;margin-bottom:6px;color:var(--success)">✅ 长度控制 50-150 词</div>
+              <div style="font-size:13px;color:var(--text-muted)">过长会使模型混乱，过短效果不稳定</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">
+              <div style="font-weight:600;margin-bottom:6px;color:var(--error)">❌ 避免负面描述</div>
+              <div style="font-size:13px;color:var(--text-muted)">不用 "no X" "without X"，直接描述想要的</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">
+              <div style="font-weight:600;margin-bottom:6px;color:var(--error)">❌ 避免矛盾指令</div>
+              <div style="font-size:13px;color:var(--text-muted)">不要同时要求 static shot 和 camera movement</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3>🎨 常用质量词组合</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px">
+              <div style="color:var(--accent2);font-weight:600;margin-bottom:6px">电影级别</div>
+              <div style="font-family:monospace;color:var(--text-muted)">cinematic, film grain, 4K, anamorphic, shallow depth of field</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px">
+              <div style="color:var(--accent2);font-weight:600;margin-bottom:6px">商业广告</div>
+              <div style="font-family:monospace;color:var(--text-muted)">commercial style, clean, polished, high-end, professional lighting</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px">
+              <div style="color:var(--accent2);font-weight:600;margin-bottom:6px">自然纪录片</div>
+              <div style="font-family:monospace;color:var(--text-muted)">documentary style, natural light, raw, authentic, 4K nature</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px">
+              <div style="color:var(--accent2);font-weight:600;margin-bottom:6px">产品展示</div>
+              <div style="font-family:monospace;color:var(--text-muted)">studio lighting, ultra-detailed, 8K, product photography, clean background</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Page: Library -->
+    <div id="page-library" class="page" style="display:none">
+      <div class="main-header">
+        <h1>📚 素材库</h1>
+        <p>镜头预设、风格预设、提示词模板、素材片段 — 一键填入表单</p>
+      </div>
+      <div class="content-area">
+        <div class="lib-tabs">
+          <button class="lib-tab active" onclick="switchLibTab('shot')">🎥 镜头预设</button>
+          <button class="lib-tab" onclick="switchLibTab('style')">🎨 风格预设</button>
+          <button class="lib-tab" onclick="switchLibTab('template')">📄 提示词模板</button>
+          <button class="lib-tab" onclick="switchLibTab('fragment')">🧩 素材片段</button>
+        </div>
+
+        <!-- Shot Presets -->
+        <div id="lib-shot" class="lib-section">
+          <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+            <button class="chip selected" onclick="filterLib('shot','')">全部</button>
+            <button class="chip" onclick="filterLib('shot','电影')">电影</button>
+            <button class="chip" onclick="filterLib('shot','商业')">商业</button>
+            <button class="chip" onclick="filterLib('shot','纪录片')">纪录片</button>
+            <button class="chip" onclick="filterLib('shot','人文')">人文</button>
+            <button class="chip" onclick="filterLib('shot','自然')">自然</button>
+            <button class="chip" onclick="filterLib('shot','创意')">创意</button>
+          </div>
+          <div class="lib-grid" id="shotPresetsGrid">加载中...</div>
+        </div>
+
+        <!-- Style Presets -->
+        <div id="lib-style" class="lib-section" style="display:none">
+          <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+            <button class="chip selected" onclick="filterLib('style','')">全部</button>
+            <button class="chip" onclick="filterLib('style','电影')">电影</button>
+            <button class="chip" onclick="filterLib('style','商业')">商业</button>
+            <button class="chip" onclick="filterLib('style','艺术')">艺术</button>
+            <button class="chip" onclick="filterLib('style','生活')">生活</button>
+          </div>
+          <div class="lib-grid" id="stylePresetsGrid">加载中...</div>
+        </div>
+
+        <!-- Templates -->
+        <div id="lib-template" class="lib-section" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="chip selected" onclick="filterLib('template','')">全部</button>
+              <button class="chip" onclick="filterLib('template','人物')">人物</button>
+              <button class="chip" onclick="filterLib('template','产品')">产品</button>
+              <button class="chip" onclick="filterLib('template','风景')">风景</button>
+              <button class="chip" onclick="filterLib('template','广告')">广告</button>
+              <button class="chip" onclick="filterLib('template','人文')">人文</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="showSaveTemplateDialog()">＋ 保存当前为模板</button>
+          </div>
+          <div class="lib-grid" id="templatesGrid">加载中...</div>
+        </div>
+
+        <!-- Fragments -->
+        <div id="lib-fragment" class="lib-section" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="chip selected" onclick="filterLib('fragment','')">全部</button>
+              <button class="chip" onclick="filterLib('fragment','character')">角色</button>
+              <button class="chip" onclick="filterLib('fragment','scene')">场景</button>
+              <button class="chip" onclick="filterLib('fragment','action')">动作</button>
+              <button class="chip" onclick="filterLib('fragment','lighting')">光线</button>
+              <button class="chip" onclick="filterLib('fragment','quality')">质量词</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="showSaveFragmentDialog()">＋ 新增片段</button>
+          </div>
+          <div class="lib-grid" id="fragmentsGrid">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page: Storyboard -->
+    <div id="page-storyboard" class="page" style="display:none">
+      <div class="main-header">
+        <h1>🎬 分镜脚本生成器</h1>
+        <p>输入视频概念，AI 按影视分镜规范自动拆解多个镜头，每个镜头附带 Seedance 提示词</p>
+      </div>
+      <div class="content-area">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>视频概念描述 <span>*</span></label>
+            <textarea id="sbConcept" style="min-height:90px" placeholder="描述你想要的视频内容，例如：一个女孩在清晨的咖啡馆里等待朋友，窗外是雨后的街道，情绪是宁静中带着一点期待"></textarea>
+          </div>
+          <div class="form-group">
+            <label>创作目标</label>
+            <select id="sbGoal">
+              <option value="">-- 选择目标 --</option>
+              <option value="brand storytelling, emotional connection">品牌故事/情感共鸣</option>
+              <option value="product showcase, highlight features">产品展示/功能演示</option>
+              <option value="documentary narrative, authentic">纪录片叙事/真实记录</option>
+              <option value="advertisement, hook viewer, drive conversion">广告/钩子+转化</option>
+              <option value="artistic expression, visual poetry">艺术表达/视觉诗意</option>
+              <option value="social media short, fast paced">社交媒体短视频/快节奏</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>目标受众</label>
+            <input type="text" id="sbAudience" placeholder="例：25-35岁都市女性，热爱生活方式内容">
+          </div>
+          <div class="form-group">
+            <label>整体基调</label>
+            <select id="sbTone">
+              <option value="">-- 选择基调 --</option>
+              <option value="cinematic and emotional">电影感·情感</option>
+              <option value="energetic and dynamic">活力·动感</option>
+              <option value="calm and contemplative">宁静·沉思</option>
+              <option value="epic and grand">史诗·宏大</option>
+              <option value="warm and nostalgic">温暖·怀旧</option>
+              <option value="dark and mysterious">暗黑·神秘</option>
+              <option value="bright and commercial">明亮·商业感</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>核心信息/卖点</label>
+            <input type="text" id="sbMessages" placeholder="例：品质感、自然材质、匠心工艺">
+          </div>
+          <div class="form-group">
+            <label>总时长</label>
+            <select id="sbDuration">
+              <option value="15s">15秒（3-4个镜头）</option>
+              <option value="30s" selected>30秒（5-6个镜头）</option>
+              <option value="60s">60秒（8-10个镜头）</option>
+              <option value="90s">90秒（12个镜头）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>镜头数量</label>
+            <select id="sbShotCount">
+              <option value="3">3个镜头</option>
+              <option value="4">4个镜头</option>
+              <option value="5" selected>5个镜头</option>
+              <option value="6">6个镜头</option>
+              <option value="8">8个镜头</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="sbBtn" onclick="generateStoryboard()">
+            <span>🎬 生成分镜脚本</span>
+          </button>
+        </div>
+        <div id="sbOutput"></div>
+      </div>
+    </div>
+
+    <!-- Page: History -->
+    <div id="page-history" class="page" style="display:none">
+      <div class="main-header">
+        <h1>🕐 历史记录</h1>
+        <p>所有已生成和优化的提示词</p>
+      </div>
+      <div class="content-area">
+        <div style="display:flex;gap:8px;margin-bottom:18px;align-items:center">
+          <button class="btn btn-secondary btn-sm" onclick="loadHistory('')">全部</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadHistory('generate')">生成</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadHistory('enhance')">优化</button>
+          <span style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="historyCount"></span>
+        </div>
+        <div id="historyList" style="display:flex;flex-direction:column;gap:10px">
+          <div style="color:var(--text-muted);font-size:13px">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page: Favorites -->
+    <div id="page-favorites" class="page" style="display:none">
+      <div class="main-header">
+        <h1>⭐ 收藏夹</h1>
+        <p>保存常用的优质提示词</p>
+      </div>
+      <div class="content-area">
+        <div id="favoritesList" style="display:flex;flex-direction:column;gap:10px">
+          <div style="color:var(--text-muted);font-size:13px">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast">✅ 已复制到剪贴板</div>
+
+<script>
+// State
+const chipState = { mood: [], quality: [] };
+let currentPage = 'generate';
+
+// Navigation
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).style.display = 'flex';
+  document.getElementById('page-' + page).style.flexDirection = 'column';
+  event.currentTarget.classList.add('active');
+  currentPage = page;
+  if (page === 'examples') loadExamples();
+}
+
+// Chip toggle
+function toggleChip(el, group) {
+  el.classList.toggle('selected');
+  const val = el.textContent.split(' ').slice(-1)[0]; // get English part
+  const idx = chipState[group].indexOf(val);
+  if (idx === -1) chipState[group].push(el.textContent);
+  else chipState[group].splice(idx, 1);
+}
+
+function getApiKey() {
+  return document.getElementById('apiKeyInput').value.trim();
+}
+
+// Generate
+async function generatePrompt() {
+  const btn = document.getElementById('generateBtn');
+  const subject = document.getElementById('subject').value.trim();
+  const action = document.getElementById('action').value.trim();
+  if (!subject && !action) {
+    showOutput('generateOutput', null, '请填写主体描述或动作');
+    return;
+  }
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showOutput('generateOutput', null, '请在左侧填入 API Key');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成中...';
+
+  const payload = {
+    subject, action,
+    scene: document.getElementById('scene').value,
+    camera: document.getElementById('camera').value,
+    style: document.getElementById('style').value,
+    lighting: document.getElementById('lighting').value,
+    mood: chipState.mood.join(', '),
+    quality: chipState.quality.join(', '),
+    description: document.getElementById('extraDesc').value,
+    api_key: apiKey
+  };
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.error) {
+      showOutput('generateOutput', null, data.error);
+    } else {
+      showGeneratedOutput(data);
+    }
+  } catch (e) {
+    showOutput('generateOutput', null, '网络错误：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>✨ 生成提示词</span>';
+  }
+}
+
+function showGeneratedOutput(data) {
+  const el = document.getElementById('generateOutput');
+  const tokens = data.usage ? `<span class="token-badge">↑${data.usage.input} ↓${data.usage.output} tokens</span>` : '';
+  el.innerHTML = `
+    <div class="output-card">
+      <div class="output-header">
+        <div class="output-title">🎬 生成结果 ${tokens}</div>
+        <button class="btn btn-secondary btn-sm" onclick="copyText(this, document.querySelector('#generateOutput .prompt-box').textContent)">复制全文</button>
+      </div>
+      <div class="output-body">
+        <div class="prompt-box">${escHtml(data.result)}</div>
+      </div>
+    </div>`;
+}
+
+// Enhance
+async function enhancePrompt() {
+  const btn = document.getElementById('enhanceBtn');
+  const raw = document.getElementById('rawPrompt').value.trim();
+  if (!raw) { showOutput('enhanceOutput', null, '请输入需要优化的提示词'); return; }
+  const apiKey = getApiKey();
+  if (!apiKey) { showOutput('enhanceOutput', null, '请在左侧填入 API Key'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 优化中...';
+
+  try {
+    const res = await fetch('/api/enhance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: raw, api_key: apiKey })
+    });
+    const data = await res.json();
+    if (data.error) {
+      showOutput('enhanceOutput', null, data.error);
+    } else {
+      showEnhancedOutput(data.result);
+    }
+  } catch (e) {
+    showOutput('enhanceOutput', null, '网络错误：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>✨ 优化提示词</span>';
+  }
+}
+
+function showEnhancedOutput(result) {
+  const el = document.getElementById('enhanceOutput');
+  const tagsHtml = (result.tags || []).map(t => `<span class="tag">${escHtml(t)}</span>`).join('');
+  el.innerHTML = `
+    <div class="output-card">
+      <div class="output-header">
+        <div class="output-title">✨ 优化结果</div>
+        <button class="btn btn-secondary btn-sm" onclick="copyText(this, '${escAttr(result.prompt || '')}')">复制提示词</button>
+      </div>
+      <div class="output-body">
+        <div class="prompt-box enhanced">${escHtml(result.prompt || '')}</div>
+        ${result.explanation ? `<div class="explanation">💡 ${escHtml(result.explanation)}</div>` : ''}
+        ${tagsHtml ? `<div class="tags-row">${tagsHtml}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// Examples
+async function loadExamples() {
+  const grid = document.getElementById('examplesGrid');
+  try {
+    const res = await fetch('/api/examples');
+    const examples = await res.json();
+    grid.innerHTML = examples.map(ex => `
+      <div class="example-card" onclick="useExample('${escAttr(ex.prompt)}')">
+        <div class="example-header">
+          <div class="example-title">${escHtml(ex.title)}</div>
+          <div class="example-cat">${escHtml(ex.category)}</div>
+        </div>
+        <div class="example-zh">${escHtml(ex.zh)}</div>
+        <div class="example-prompt">${escHtml(ex.prompt)}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    grid.innerHTML = '<div style="color:var(--error)">加载失败</div>';
+  }
+}
+
+function useExample(prompt) {
+  document.getElementById('rawPrompt').value = prompt;
+  switchPageTo('enhance');
+  showToast('已填入优化框，可直接点击优化');
+}
+
+function switchPageTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).style.display = 'flex';
+  document.getElementById('page-' + page).style.flexDirection = 'column';
+  const pageOrder = ['generate','enhance','examples','guide','history','favorites'];
+  const idx = pageOrder.indexOf(page);
+  if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
+}
+
+// Helpers
+function showOutput(id, html, error) {
+  const el = document.getElementById(id);
+  if (error) {
+    el.innerHTML = `<div class="alert alert-error" style="margin-top:16px">⚠️ ${escHtml(error)}</div>`;
+  } else {
+    el.innerHTML = html;
+  }
+}
+
+function clearForm() {
+  ['subject', 'action', 'scene', 'extraDesc'].forEach(id => document.getElementById(id).value = '');
+  ['camera', 'style', 'lighting'].forEach(id => document.getElementById(id).selectedIndex = 0);
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  chipState.mood = []; chipState.quality = [];
+  document.getElementById('generateOutput').innerHTML = '';
+}
+
+function copyText(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('已复制到剪贴板');
+    btn.textContent = '✅ 已复制';
+    setTimeout(() => btn.textContent = '复制提示词', 2000);
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = '✅ ' + msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return String(s).replace(/'/g, "\\'").replace(/\n/g, '\\n');
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
+
+async function loadHistory(mode) {
+  const list = document.getElementById('historyList');
+  const count = document.getElementById('historyCount');
+  list.innerHTML = '<div style="color:var(--text-muted);font-size:13px">加载中...</div>';
+  try {
+    const res = await fetch(`/api/history?mode=${mode}&limit=50`);
+    const rows = await res.json();
+    if (rows.error) { list.innerHTML = `<div style="color:var(--error)">${escHtml(rows.error)}</div>`; return; }
+    count.textContent = `共 ${rows.length} 条`;
+    if (!rows.length) { list.innerHTML = '<div style="color:var(--text-muted);font-size:13px">暂无记录</div>'; return; }
+    list.innerHTML = rows.map(r => {
+      const label = r.mode === 'generate'
+        ? [r.subject, r.action, r.scene].filter(Boolean).join(' / ')
+        : (r.raw_input || '').slice(0, 60);
+      const time = new Date(r.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const modeBadge = r.mode === 'generate'
+        ? '<span style="background:rgba(108,99,255,.2);color:var(--accent2);padding:2px 7px;border-radius:10px;font-size:11px">生成</span>'
+        : '<span style="background:rgba(16,185,129,.15);color:var(--success);padding:2px 7px;border-radius:10px;font-size:11px">优化</span>';
+      const tokens = r.tokens_in ? `<span style="font-size:11px;color:var(--text-muted)">↑${r.tokens_in} ↓${r.tokens_out}</span>` : '';
+      return `
+        <div class="history-card" onclick="loadHistoryDetail(${r.id})">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            ${modeBadge}
+            <span style="font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(label || '(无标题)')}</span>
+            ${tokens}
+            <span style="font-size:11px;color:var(--text-muted);flex-shrink:0">${time}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);font-family:monospace;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${escHtml((r.result_preview||'').replace(/\*\*/g,''))}</div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div style="color:var(--error)">加载失败</div>`;
+  }
+}
+
+async function loadHistoryDetail(id) {
+  try {
+    const res = await fetch(`/api/history/${id}`);
+    const r = await res.json();
+    // Open result in enhance box for re-use
+    document.getElementById('rawPrompt').value = r.result || '';
+    switchPageTo('enhance');
+    showToast('已载入历史记录到优化框');
+  } catch(e) {}
+}
+
+// ── Favorites ─────────────────────────────────────────────────────────────────
+
+async function loadFavorites() {
+  const list = document.getElementById('favoritesList');
+  list.innerHTML = '<div style="color:var(--text-muted);font-size:13px">加载中...</div>';
+  try {
+    const res = await fetch('/api/favorites');
+    const rows = await res.json();
+    if (!rows.length) { list.innerHTML = '<div style="color:var(--text-muted);font-size:13px">暂无收藏，生成提示词后点击 ⭐ 收藏</div>'; return; }
+    list.innerHTML = rows.map(r => {
+      const time = new Date(r.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const tagsHtml = (r.tags||[]).map(t => `<span class="tag">${escHtml(t)}</span>`).join('');
+      return `
+        <div class="history-card">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:600;flex:1">${escHtml(r.title||'收藏提示词')}</span>
+            <span style="font-size:11px;color:var(--text-muted)">${time}</span>
+            <button onclick="deleteFavorite(${r.id},this)" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px" title="删除">🗑</button>
+          </div>
+          <div class="prompt-box" style="margin-bottom:8px;font-size:12px">${escHtml(r.prompt_en)}</div>
+          ${r.note ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${escHtml(r.note)}</div>` : ''}
+          ${tagsHtml ? `<div class="tags-row">${tagsHtml}</div>` : ''}
+          <div style="margin-top:8px">
+            <button class="btn btn-secondary btn-sm" onclick="copyText(this,'${escAttr(r.prompt_en)}')">复制</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div style="color:var(--error)">加载失败</div>`;
+  }
+}
+
+async function saveFavorite(promptEn, tags) {
+  const title = prompt('收藏标题（可选）：', '') || '';
+  try {
+    const res = await fetch('/api/favorites', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({prompt_en: promptEn, title, tags: tags||[]})
+    });
+    const data = await res.json();
+    if (data.error) { showToast('收藏失败：' + data.error); return; }
+    showToast('已收藏 ⭐');
+  } catch(e) { showToast('收藏失败'); }
+}
+
+async function deleteFavorite(id, btn) {
+  if (!confirm('确认删除这条收藏？')) return;
+  try {
+    await fetch(`/api/favorites/${id}`, {method:'DELETE'});
+    btn.closest('.history-card').remove();
+    showToast('已删除');
+  } catch(e) {}
+}
+
+// ── Override showGeneratedOutput to add save button ───────────────────────────
+
+function showGeneratedOutput(data) {
+  const el = document.getElementById('generateOutput');
+  const tokens = data.usage ? `<span class="token-badge">↑${data.usage.input} ↓${data.usage.output} tokens</span>` : '';
+  const promptText = data.result || '';
+  el.innerHTML = `
+    <div class="output-card">
+      <div class="output-header">
+        <div class="output-title">🎬 生成结果 ${tokens}</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm" onclick="copyText(this, document.querySelector('#generateOutput .prompt-box').textContent)">复制</button>
+          <button class="btn btn-secondary btn-sm" onclick="saveFavorite(document.querySelector('#generateOutput .prompt-box').textContent, [])">⭐ 收藏</button>
+        </div>
+      </div>
+      <div class="output-body">
+        <div class="prompt-box">${escHtml(promptText)}</div>
+      </div>
+    </div>`;
+}
+
+// ── Override switchPage to load data ──────────────────────────────────────────
+
+const _origSwitchPage = window.switchPage;
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).style.display = 'flex';
+  document.getElementById('page-' + page).style.flexDirection = 'column';
+  const pageOrder = ['generate','enhance','examples','guide','history','favorites'];
+  const idx = pageOrder.indexOf(page);
+  if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
+  currentPage = page;
+  if (page === 'examples') loadExamples();
+  if (page === 'history') loadHistory('');
+  if (page === 'favorites') loadFavorites();
+}
+
+// ── Library ───────────────────────────────────────────────────────────────────
+
+let libCache = {};
+let currentLibTab = 'shot';
+
+function switchLibTab(tab) {
+  currentLibTab = tab;
+  document.querySelectorAll('.lib-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['shot','style','template','fragment'][i] === tab);
+  });
+  document.querySelectorAll('.lib-section').forEach(s => s.style.display = 'none');
+  document.getElementById(`lib-${tab}`).style.display = 'block';
+  loadLibSection(tab, '');
+}
+
+async function loadLibSection(tab, category) {
+  const endpoints = {
+    shot: '/api/library/shot-presets',
+    style: '/api/library/style-presets',
+    template: '/api/library/templates',
+    fragment: '/api/library/fragments'
+  };
+  const gridIds = {
+    shot: 'shotPresetsGrid',
+    style: 'stylePresetsGrid',
+    template: 'templatesGrid',
+    fragment: 'fragmentsGrid'
+  };
+  const grid = document.getElementById(gridIds[tab]);
+  const url = endpoints[tab] + (category ? `?${tab === 'fragment' ? 'type' : 'category'}=${category}` : '');
+  grid.innerHTML = '<div style="color:var(--text-muted);font-size:13px">加载中...</div>';
+  try {
+    const res = await fetch(url);
+    const items = await res.json();
+    if (!items.length) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:13px">暂无数据</div>'; return; }
+    grid.innerHTML = items.map(item => renderLibCard(tab, item)).join('');
+  } catch(e) {
+    grid.innerHTML = `<div style="color:var(--error)">加载失败</div>`;
+  }
+}
+
+function filterLib(tab, category) {
+  // update chip state
+  const section = document.getElementById(`lib-${tab}`);
+  section.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  loadLibSection(tab, category);
+}
+
+function renderLibCard(tab, item) {
+  const tags = (item.tags || []).map(t => `<span class="lib-badge">${escHtml(t)}</span>`).join('');
+  const useCount = item.use_count > 0 ? `<span style="font-size:10px;color:var(--text-muted)">使用 ${item.use_count} 次</span>` : '';
+  const builtinBadge = item.is_builtin ? '' : '<span class="lib-badge" style="background:rgba(52,211,153,.12);color:var(--success)">自定义</span>';
+
+  if (tab === 'shot') {
+    return `<div class="lib-card" onclick="applyShotPreset(${item.id}, ${JSON.stringify(item).replace(/"/g,'&quot;')})">
+      <div class="lib-card-name">${escHtml(item.name)}</div>
+      <div class="lib-card-desc">${escHtml(item.description_zh || '')}</div>
+      <div class="lib-card-fragment">${escHtml(item.fragment_en || '')}</div>
+      <div class="lib-card-meta">${builtinBadge}<span class="lib-badge">${escHtml(item.category||'')}</span>${tags}${useCount}</div>
+      <div class="lib-card-actions">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();applyShotPreset(${item.id}, ${JSON.stringify(item).replace(/"/g,'&quot;')})">填入表单</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();copyLibItem('${escAttr(item.fragment_en||'')}')">复制片段</button>
+      </div>
+    </div>`;
+  }
+  if (tab === 'style') {
+    return `<div class="lib-card" onclick="applyStylePreset(${item.id}, ${JSON.stringify(item).replace(/"/g,'&quot;')})">
+      <div class="lib-card-name">${escHtml(item.name)}</div>
+      <div class="lib-card-desc">${escHtml(item.description_zh || '')}</div>
+      <div class="lib-card-fragment">${escHtml(item.fragment_en || '')}</div>
+      <div class="lib-card-meta">${builtinBadge}<span class="lib-badge">${escHtml(item.category||'')}</span>${tags}${useCount}</div>
+      <div class="lib-card-actions">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();applyStylePreset(${item.id}, ${JSON.stringify(item).replace(/"/g,'&quot;')})">填入表单</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();copyLibItem('${escAttr(item.fragment_en||'')}')">复制片段</button>
+      </div>
+    </div>`;
+  }
+  if (tab === 'template') {
+    return `<div class="lib-card" onclick="applyTemplate(${item.id}, ${JSON.stringify(item).replace(/"/g,'&quot;')})">
+      <div class="lib-card-name">${escHtml(item.name)}</div>
+      <div class="lib-card-desc">${escHtml(item.description_zh || '')}</div>
+      <div class="lib-card-fragment">${escHtml((item.prompt_en||'').slice(0,120))}…</div>
+      <div class="lib-card-meta">${builtinBadge}<span class="lib-badge">${escHtml(item.category||'')}</span>${tags}${useCount}</div>
+      <div class="lib-card-actions">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();applyTemplate(${item.id}, ${JSON.stringify(item).replace(/"/g,'&quot;')})">填入表单</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();copyLibItem('${escAttr(item.prompt_en||'')}')">复制模板</button>
+      </div>
+    </div>`;
+  }
+  if (tab === 'fragment') {
+    const typeLabel = {'character':'角色','scene':'场景','action':'动作','lighting':'光线','quality':'质量词'}[item.type] || item.type;
+    return `<div class="lib-card" onclick="applyFragment(${item.id}, '${escAttr(item.content_en||'')}', '${escAttr(item.type||'')}')">
+      <div class="lib-card-name">${escHtml(item.name)} <span class="lib-badge">${typeLabel}</span></div>
+      ${item.content_zh ? `<div class="lib-card-desc">${escHtml(item.content_zh)}</div>` : ''}
+      <div class="lib-card-fragment">${escHtml(item.content_en || '')}</div>
+      <div class="lib-card-meta">${builtinBadge}${tags}${useCount}</div>
+      <div class="lib-card-actions">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();applyFragment(${item.id}, '${escAttr(item.content_en||'')}', '${escAttr(item.type||'')}')">插入</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();copyLibItem('${escAttr(item.content_en||'')}')">复制</button>
+      </div>
+    </div>`;
+  }
+}
+
+// Apply functions — fill form fields then navigate to generate page
+function applyShotPreset(id, item) {
+  fetch(`/api/library/use/shot_presets/${id}`, {method:'POST'});
+  if (item.camera_move) document.getElementById('camera').value = item.camera_move + (item.shot_type ? ', ' + item.shot_type : '');
+  if (item.composition) { /* no direct field yet, append to extra */ }
+  if (item.lighting)    document.getElementById('lighting').value = item.lighting;
+  if (item.style)       document.getElementById('style').value = item.style;
+  switchPageTo('generate');
+  showToast(`镜头预设「${item.name}」已填入表单`);
+}
+
+function applyStylePreset(id, item) {
+  fetch(`/api/library/use/style_presets/${id}`, {method:'POST'});
+  if (item.style)    document.getElementById('style').value = item.style;
+  if (item.lighting) document.getElementById('lighting').value = item.lighting;
+  switchPageTo('generate');
+  showToast(`风格预设「${item.name}」已填入表单`);
+}
+
+function applyTemplate(id, item) {
+  fetch(`/api/library/use/prompt_templates/${id}`, {method:'POST'});
+  if (item.camera)    document.getElementById('camera').value = item.camera;
+  if (item.style)     document.getElementById('style').value = item.style;
+  if (item.lighting)  document.getElementById('lighting').value = item.lighting;
+  // Fill hints as placeholders in extra
+  const hints = [item.subject_hint, item.action_hint, item.scene_hint].filter(Boolean).join(' | ');
+  if (hints) document.getElementById('extraDesc').value = '模板提示：' + hints + '\n\n模板：' + (item.prompt_en || '');
+  switchPageTo('generate');
+  showToast(`模板「${item.name}」已填入`);
+}
+
+function applyFragment(id, content, type) {
+  fetch(`/api/library/use/fragments/${id}`, {method:'POST'});
+  const fieldMap = { character: 'subject', scene: 'scene', action: 'action' };
+  const field = fieldMap[type];
+  if (field) {
+    const el = document.getElementById(field);
+    el.value = (el.value ? el.value + ' ' : '') + content;
+    switchPageTo('generate');
+    showToast(`片段已插入「${field === 'subject' ? '主体' : field === 'scene' ? '场景' : '动作'}」字段`);
+  } else {
+    // For lighting/quality, append to extra
+    const el = document.getElementById('extraDesc');
+    el.value = (el.value ? el.value + '\n' : '') + content;
+    switchPageTo('generate');
+    showToast('片段已追加到补充说明');
+  }
+}
+
+function copyLibItem(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('已复制'));
+}
+
+async function showSaveTemplateDialog() {
+  const name = prompt('模板名称：');
+  if (!name) return;
+  const payload = {
+    name,
+    category: '自定义',
+    prompt_en: document.getElementById('extraDesc').value || '(请填入提示词)',
+    camera: document.getElementById('camera').value,
+    style: document.getElementById('style').value,
+    lighting: document.getElementById('lighting').value,
+    subject_hint: document.getElementById('subject').value,
+    action_hint: document.getElementById('action').value,
+    scene_hint: document.getElementById('scene').value,
+  };
+  const res = await fetch('/api/library/templates', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const data = await res.json();
+  if (data.error) { showToast('保存失败：' + data.error); return; }
+  showToast('模板已保存到素材库');
+  libCache = {};
+}
+
+async function showSaveFragmentDialog() {
+  const name = prompt('片段名称：');
+  if (!name) return;
+  const content_en = prompt('英文内容：');
+  if (!content_en) return;
+  const content_zh = prompt('中文说明（可选）：') || '';
+  const typeOpts = 'character(角色)\nscene(场景)\naction(动作)\nlighting(光线)\nquality(质量词)\nother(其他)';
+  const typeInput = prompt(`类型：\n${typeOpts}\n\n请输入类型代码：`, 'other') || 'other';
+  const res = await fetch('/api/library/fragments', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, content_en, content_zh, type: typeInput})
+  });
+  const data = await res.json();
+  if (data.error) { showToast('保存失败：' + data.error); return; }
+  showToast('片段已保存到素材库');
+  loadLibSection('fragment', '');
+}
+
+// ── Storyboard ────────────────────────────────────────────────────────────────
+
+async function generateStoryboard() {
+  const btn = document.getElementById('sbBtn');
+  const concept = document.getElementById('sbConcept').value.trim();
+  if (!concept) { showToast('请填写视频概念描述', 'error'); return; }
+  const apiKey = getApiKey();
+  if (!apiKey) { showToast('请填入 API Key', 'error'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成分镜中...';
+
+  const payload = {
+    concept,
+    creative_goal:   document.getElementById('sbGoal').value,
+    target_audience: document.getElementById('sbAudience').value,
+    overall_tone:    document.getElementById('sbTone').value,
+    key_messages:    document.getElementById('sbMessages').value,
+    duration_total:  document.getElementById('sbDuration').value,
+    shot_count:      parseInt(document.getElementById('sbShotCount').value),
+    api_key: apiKey
+  };
+
+  try {
+    const res = await fetch('/api/storyboard', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.error) { showToast(data.error, 'error'); document.getElementById('sbOutput').innerHTML = `<div class="alert alert-error" style="margin-top:16px">⚠️ ${escHtml(data.error)}</div>`; return; }
+    renderStoryboard(data.result, data.usage);
+    showToast('分镜脚本生成完成！');
+  } catch(e) {
+    showToast('网络错误', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>🎬 生成分镜脚本</span>';
+  }
+}
+
+function renderStoryboard(sb, usage) {
+  const tokens = usage ? `<span class="token-badge">↑${usage.input} ↓${usage.output} tokens</span>` : '';
+  const shots = (sb.shots || []).map((shot, i) => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="background:var(--accent);color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">镜头 ${shot.shot_number}</div>
+        <span style="font-size:12px;color:var(--text-muted)">${escHtml(shot.shot_type||'')} · ${escHtml(shot.duration||'')}</span>
+        <span style="font-size:12px;color:var(--accent2)">${escHtml(shot.camera_move||'')}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">${escHtml(shot.composition||'')}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${escHtml(shot.description_zh||'')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;font-size:11px;color:var(--text-muted)">
+        <div><strong style="color:var(--text)">首帧：</strong>${escHtml(shot.first_frame||'')}</div>
+        <div><strong style="color:var(--text)">末帧：</strong>${escHtml(shot.last_frame||'')}</div>
+      </div>
+      <div style="background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);border-radius:6px;padding:10px;font-family:monospace;font-size:12px;color:#c4b5fd;line-height:1.7;margin-bottom:8px">${escHtml(shot.prompt_en||'')}</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="copyText(this,'${escAttr(shot.prompt_en||'')}')">复制提示词</button>
+        <button class="btn btn-ghost btn-sm" onclick="saveFavorite('${escAttr(shot.prompt_en||'')}', ['分镜脚本','镜头${shot.shot_number}'])">⭐ 收藏</button>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('sbOutput').innerHTML = `
+    <div class="output-card">
+      <div class="output-header">
+        <div class="output-title">🎬 ${escHtml(sb.title||'分镜脚本')} ${tokens}</div>
+        <button class="btn btn-secondary btn-sm" onclick="exportStoryboard()">导出全部提示词</button>
+      </div>
+      <div class="output-body">
+        <div style="background:rgba(16,185,129,.08);border-left:3px solid var(--success);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;margin-bottom:16px">
+          <strong>叙事思路：</strong>${escHtml(sb.narrative_summary||'')}
+          <span style="margin-left:12px;color:var(--text-muted)">总时长：${escHtml(sb.total_duration||'')}</span>
+        </div>
+        ${shots}
+      </div>
+    </div>`;
+  window._lastStoryboard = sb;
+}
+
+function exportStoryboard() {
+  const sb = window._lastStoryboard;
+  if (!sb) return;
+  const text = (sb.shots||[]).map(s =>
+    `=== 镜头 ${s.shot_number} [${s.shot_type} · ${s.duration}] ===\n${s.prompt_en}`
+  ).join('\n\n');
+  navigator.clipboard.writeText(text).then(() => showToast('全部提示词已复制'));
+}
+
+// ── switchPage override (final) ───────────────────────────────────────────────
+
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const el = document.getElementById('page-' + page);
+  if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
+  const pageOrder = ['generate','enhance','storyboard','library','examples','favorites','history','guide'];
+  const idx = pageOrder.indexOf(page);
+  if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
+  currentPage = page;
+  if (page === 'examples')  loadExamples();
+  if (page === 'history')   loadHistory('');
+  if (page === 'favorites') loadFavorites();
+  if (page === 'library')   { loadLibSection('shot', ''); }
+}
+
+function switchPageTo(page) { switchPage(page); }
+
+// Set initial page display
+document.getElementById('page-generate').style.display = 'flex';
+document.getElementById('page-generate').style.flexDirection = 'column';
+</script>
+</body>
+</html>
