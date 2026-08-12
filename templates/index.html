@@ -1897,15 +1897,19 @@ async function caseToStoryboard(caseId) {
     if (!data.success) { showToast('加载失败', 'error'); return; }
     const c = data.data;
 
-    // Build storyboard concept from case fields
+    // Build storyboard concept from case fields — pass ALL content so narration can be complete
     const kp = Array.isArray(c.key_points) ? c.key_points : (typeof c.key_points === 'string' ? JSON.parse(c.key_points||'[]') : []);
-    const concept = [
-      c.title,
-      c.insurance_needs ? c.insurance_needs.slice(0,200).replace(/\n/g,' ') : '',
-      c.description ? '【核心方案】' + c.description.slice(0,300).replace(/\n/g,' ') : '',
+    const parts = [
+      `【案例标题】${c.title}`,
+      c.family_structure ? `【客户背景】${c.family_structure}` : '',
+      c.insurance_needs  ? `【保险需求】${c.insurance_needs}` : '',
+      c.description      ? `【方案说明】${c.description}` : '',
+      c.content          ? `【完整内容】${c.content.replace(/#+\s*/g,'').replace(/\n{3,}/g,'\n\n')}` : '',
+      kp.length          ? `【核心要点】${kp.join('；')}` : '',
+      c.budget_suggestion? `【预算建议】${c.budget_suggestion}` : '',
     ].filter(Boolean).join('\n\n');
 
-    document.getElementById('sbConcept').value = concept.slice(0, 600);
+    document.getElementById('sbConcept').value = parts;
     document.getElementById('sbGoal').value = '完整讲述保险案例，科普港险知识，帮助受众了解方案价值';
     document.getElementById('sbTone').value = '专业亲切，信任感强，娓娓道来';
     document.getElementById('sbMessages').value = kp.length ? kp.slice(0,3).join('、') : (c.budget_suggestion || c.title);
@@ -1929,8 +1933,9 @@ async function qaToStoryboard(qaId) {
     if (!data.success) { showToast('加载失败', 'error'); return; }
     const q = data.data;
 
-    const concept = `${q.title}\n\n${(q.content||'').slice(0,400).replace(/#+\s*/g,'').replace(/\n{2,}/g,'\n')}`;
-    document.getElementById('sbConcept').value = concept.slice(0, 600);
+    const qaContent = (q.content||'').replace(/#+\s*/g,'').replace(/\n{3,}/g,'\n\n');
+    const concept = `【话题标题】${q.title}\n\n【完整内容】${qaContent}`;
+    document.getElementById('sbConcept').value = concept;
     document.getElementById('sbGoal').value = '完整科普这个港险话题，解答受众疑惑，建立专业信任感';
     document.getElementById('sbTone').value = '专业亲切，逻辑清晰，娓娓道来';
     document.getElementById('sbMessages').value = q.title.slice(0, 80);
