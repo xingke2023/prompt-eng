@@ -486,7 +486,7 @@
         <span class="nav-icon">📖</span> 提示词指南
       </div>
     </nav>
-    <div class="api-box">
+    <div class="api-box" style="display:none">
       <label>API Key (Claude)</label>
       <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-..." />
     </div>
@@ -1042,10 +1042,6 @@ async function generatePrompt() {
     return;
   }
   const apiKey = getApiKey();
-  if (!apiKey) {
-    showOutput('generateOutput', null, '请在左侧填入 API Key');
-    return;
-  }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> 生成中...';
@@ -1103,7 +1099,6 @@ async function enhancePrompt() {
   const raw = document.getElementById('rawPrompt').value.trim();
   if (!raw) { showOutput('enhanceOutput', null, '请输入需要优化的提示词'); return; }
   const apiKey = getApiKey();
-  if (!apiKey) { showOutput('enhanceOutput', null, '请在左侧填入 API Key'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> 优化中...';
@@ -1572,7 +1567,6 @@ async function generateStoryboard() {
   const concept = document.getElementById('sbConcept').value.trim();
   if (!concept) { showToast('请填写视频概念描述', 'error'); return; }
   const apiKey = getApiKey();
-  if (!apiKey) { showToast('请填入 API Key', 'error'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> 生成分镜中...';

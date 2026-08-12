@@ -7,7 +7,9 @@ import anthropic
 
 app = Flask(__name__)
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+DEFAULT_API_KEY  = os.environ.get("ANTHROPIC_API_KEY", "")
+DEFAULT_BASE_URL = os.environ.get("ANTHROPIC_BASE_URL", "https://tokens.fidelityai.net/")
+DEFAULT_MODEL    = "claude-sonnet-4-6"
 
 DB_CONFIG = {
     "host":     os.environ.get("DB_HOST", "localhost"),
@@ -22,8 +24,11 @@ def get_db():
     return psycopg2.connect(**DB_CONFIG)
 
 
-def get_client(api_key):
-    return anthropic.Anthropic(api_key=api_key)
+def get_client(api_key=None):
+    return anthropic.Anthropic(
+        api_key=api_key or DEFAULT_API_KEY,
+        base_url=DEFAULT_BASE_URL,
+    )
 
 
 # ── System prompts ─────────────────────────────────────────────────────────────
@@ -250,10 +255,7 @@ def index():
 @app.route("/api/generate", methods=["POST"])
 def generate_prompt():
     data = request.json
-    api_key = data.get("api_key", "") or ANTHROPIC_API_KEY
-    if not api_key:
-        return jsonify({"error": "请在左侧填入 API Key"}), 400
-
+    api_key = data.get("api_key") or DEFAULT_API_KEY
     subject     = data.get("subject", "").strip()
     action      = data.get("action", "").strip()
     scene       = data.get("scene", "").strip()
@@ -291,7 +293,7 @@ def generate_prompt():
     try:
         client = get_client(api_key)
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=DEFAULT_MODEL,
             max_tokens=1024,
             system=SINGLE_SHOT_SYSTEM,
             messages=[{"role": "user", "content": "生成 Seedance 提示词：\n\n" + "\n".join(parts)}],
@@ -334,14 +336,12 @@ def enhance_prompt():
     if not raw_prompt:
         return jsonify({"error": "请输入需要优化的提示词"}), 400
 
-    api_key = data.get("api_key", "") or ANTHROPIC_API_KEY
-    if not api_key:
-        return jsonify({"error": "请在左侧填入 API Key"}), 400
+    api_key = data.get("api_key") or DEFAULT_API_KEY
 
     try:
         client = get_client(api_key)
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=DEFAULT_MODEL,
             max_tokens=800,
             system=ENHANCE_SYSTEM,
             messages=[{"role": "user", "content": f"优化：{raw_prompt}"}],
@@ -377,9 +377,7 @@ def enhance_prompt():
 @app.route("/api/storyboard", methods=["POST"])
 def generate_storyboard():
     data = request.json
-    api_key = data.get("api_key", "") or ANTHROPIC_API_KEY
-    if not api_key:
-        return jsonify({"error": "请在左侧填入 API Key"}), 400
+    api_key = data.get("api_key") or DEFAULT_API_KEY
 
     concept              = data.get("concept", "").strip()
     creative_goal        = data.get("creative_goal", "").strip()
@@ -415,7 +413,7 @@ def generate_storyboard():
     try:
         client = get_client(api_key)
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=DEFAULT_MODEL,
             max_tokens=4096,
             system=system_prompt,
             messages=[{"role": "user", "content": user_msg}],
