@@ -726,5 +726,157 @@ def record_use(table, item_id):
         return jsonify({"error": str(e)}), 500
 
 
+# ── 港险案例库 APIs ────────────────────────────────────────────────────────────
+
+@app.route("/api/cases", methods=["GET"])
+def get_cases():
+    """List insurance cases with optional tag/search filter + pagination."""
+    try:
+        tag     = request.args.get("tag", "").strip()
+        search  = request.args.get("search", "").strip()
+        featured_only = request.args.get("featured", "").lower() == "true"
+        page    = max(1, int(request.args.get("page", 1)))
+        limit   = min(50, max(1, int(request.args.get("limit", 20))))
+        offset  = (page - 1) * limit
+
+        conditions = []
+        params = []
+        if featured_only:
+            conditions.append("is_featured = TRUE")
+        if tag:
+            conditions.append("%s = ANY(tags)")
+            params.append(tag)
+        if search:
+            conditions.append("(title ILIKE %s OR description ILIKE %s OR insurance_needs ILIKE %s)")
+            params += [f"%{search}%", f"%{search}%", f"%{search}%"]
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        with get_db() as db:
+            with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(f"SELECT COUNT(*) FROM insurance_cases {where}", params)
+                total = cur.fetchone()["count"]
+                cur.execute(f"""
+                    SELECT id, source_id, title, tags, customer_age,
+                           family_structure, insurance_needs,
+                           LEFT(description, 300) AS description_preview,
+                           budget_suggestion, is_featured, sort_order, created_at
+                    FROM insurance_cases {where}
+                    ORDER BY is_featured DESC, sort_order, id
+                    LIMIT %s OFFSET %s
+                """, params + [limit, offset])
+                rows = cur.fetchall()
+        return jsonify({"success": True, "total": total, "page": page,
+                        "limit": limit, "results": [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cases/<int:case_id>", methods=["GET"])
+def get_case(case_id):
+    """Get full detail of a single insurance case."""
+    try:
+        with get_db() as db:
+            with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT * FROM insurance_cases WHERE id = %s", (case_id,))
+                row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"success": True, "data": dict(row)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cases/tags", methods=["GET"])
+def get_case_tags():
+    """Return all tags used in insurance_cases with counts."""
+    try:
+        with get_db() as db:
+            with db.cursor() as cur:
+                cur.execute("SELECT UNNEST(tags) AS tag FROM insurance_cases")
+                rows = cur.fetchall()
+        counts = {}
+        for (tag,) in rows:
+            if tag:
+                counts[tag] = counts.get(tag, 0) + 1
+        tag_list = sorted(counts.items(), key=lambda x: -x[1])
+        return jsonify({"success": True, "tags": [{"name": t, "count": c} for t, c in tag_list]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/qa", methods=["GET"])
+def get_qa():
+    """List HK insurance Q&As with optional tag/search filter + pagination."""
+    try:
+        tag    = request.args.get("tag", "").strip()
+        search = request.args.get("search", "").strip()
+        page   = max(1, int(request.args.get("page", 1)))
+        limit  = min(50, max(1, int(request.args.get("limit", 20))))
+        offset = (page - 1) * limit
+
+        conditions = []
+        params = []
+        if tag:
+            conditions.append("%s = ANY(tags)")
+            params.append(tag)
+        if search:
+            conditions.append("(title ILIKE %s OR content ILIKE %s)")
+            params += [f"%{search}%", f"%{search}%"]
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        with get_db() as db:
+            with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(f"SELECT COUNT(*) FROM insurance_qa {where}", params)
+                total = cur.fetchone()["count"]
+                cur.execute(f"""
+                    SELECT id, source_id, title, tags,
+                           LEFT(content, 300) AS content_preview,
+                           sort_order, created_at
+                    FROM insurance_qa {where}
+                    ORDER BY sort_order, id
+                    LIMIT %s OFFSET %s
+                """, params + [limit, offset])
+                rows = cur.fetchall()
+        return jsonify({"success": True, "total": total, "page": page,
+                        "limit": limit, "results": [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/qa/<int:qa_id>", methods=["GET"])
+def get_qa_detail(qa_id):
+    """Get full content of a single Q&A."""
+    try:
+        with get_db() as db:
+            with db.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT * FROM insurance_qa WHERE id = %s", (qa_id,))
+                row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"success": True, "data": dict(row)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/qa/tags", methods=["GET"])
+def get_qa_tags():
+    """Return all tags used in insurance_qa with counts."""
+    try:
+        with get_db() as db:
+            with db.cursor() as cur:
+                cur.execute("SELECT UNNEST(tags) AS tag FROM insurance_qa")
+                rows = cur.fetchall()
+        counts = {}
+        for (tag,) in rows:
+            if tag:
+                counts[tag] = counts.get(tag, 0) + 1
+        tag_list = sorted(counts.items(), key=lambda x: -x[1])
+        return jsonify({"success": True, "tags": [{"name": t, "count": c} for t, c in tag_list]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8129)

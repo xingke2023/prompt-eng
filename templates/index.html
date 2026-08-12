@@ -469,6 +469,9 @@
       <div class="nav-item" onclick="switchPage('library')">
         <span class="nav-icon">📚</span> 素材库
       </div>
+      <div class="nav-item" onclick="switchPage('cases')">
+        <span class="nav-icon">🏦</span> 港险案例库
+      </div>
       <div class="nav-item" onclick="switchPage('examples')">
         <span class="nav-icon">📁</span> 示例库
       </div>
@@ -935,6 +938,31 @@
           </button>
         </div>
         <div id="sbOutput"></div>
+      </div>
+    </div>
+
+    <!-- Page: HK Insurance Cases -->
+    <div id="page-cases" class="page" style="display:none">
+      <div class="main-header">
+        <h1>🏦 港险案例库</h1>
+        <p>精选港险真实案例与问答，一键生成视频分镜脚本</p>
+      </div>
+      <div class="content-area">
+        <!-- Sub-tabs + search -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <button id="caseTab-cases" class="btn btn-primary btn-sm" onclick="switchCaseTab('cases')">🔥 精选案例</button>
+          <button id="caseTab-qa" class="btn btn-secondary btn-sm" onclick="switchCaseTab('qa')">💬 港险问答</button>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <input type="text" id="caseSearchInput" placeholder="搜索标题、内容..." style="border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;padding:5px 10px;font-size:13px;width:200px" oninput="onCaseSearch()" />
+            <span id="casesTotal" style="font-size:12px;color:var(--text-muted)"></span>
+          </div>
+        </div>
+        <!-- Tag cloud -->
+        <div id="caseTagCloud" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
+        <!-- Grid -->
+        <div id="casesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px"></div>
+        <!-- Pagination -->
+        <div id="casesPagination" style="display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap"></div>
       </div>
     </div>
 
@@ -1662,7 +1690,7 @@ function switchPage(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const el = document.getElementById('page-' + page);
   if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
-  const pageOrder = ['generate','enhance','storyboard','library','examples','favorites','history','guide'];
+  const pageOrder = ['generate','enhance','storyboard','library','cases','examples','favorites','history','guide'];
   const idx = pageOrder.indexOf(page);
   if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
   currentPage = page;
@@ -1670,9 +1698,244 @@ function switchPage(page) {
   if (page === 'history')   loadHistory('');
   if (page === 'favorites') loadFavorites();
   if (page === 'library')   { loadLibSection('shot', ''); }
+  if (page === 'cases')     { initCasesPage(); }
 }
 
 function switchPageTo(page) { switchPage(page); }
+
+// ── 港险案例库 ─────────────────────────────────────────────────────────────────
+
+const casesState = {
+  tab: 'cases',    // 'cases' | 'qa'
+  tag: '',
+  search: '',
+  page: 1,
+  tagsLoaded: { cases: false, qa: false }
+};
+
+function initCasesPage() {
+  if (!casesState.tagsLoaded[casesState.tab]) {
+    loadCaseTags(casesState.tab);
+  }
+  fetchCasesOrQa();
+}
+
+function switchCaseTab(tab) {
+  casesState.tab = tab;
+  casesState.tag = '';
+  casesState.search = '';
+  casesState.page = 1;
+  document.getElementById('caseSearchInput').value = '';
+  document.getElementById('caseTab-cases').className = tab === 'cases' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+  document.getElementById('caseTab-qa').className = tab === 'qa' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+  if (!casesState.tagsLoaded[tab]) loadCaseTags(tab);
+  fetchCasesOrQa();
+}
+
+let caseSearchTimer = null;
+function onCaseSearch() {
+  clearTimeout(caseSearchTimer);
+  caseSearchTimer = setTimeout(() => {
+    casesState.search = document.getElementById('caseSearchInput').value.trim();
+    casesState.page = 1;
+    fetchCasesOrQa();
+  }, 350);
+}
+
+function filterCaseByTag(tag) {
+  casesState.tag = (casesState.tag === tag) ? '' : tag;
+  casesState.page = 1;
+  loadCaseTags(casesState.tab);
+  fetchCasesOrQa();
+}
+
+async function loadCaseTags(tab) {
+  const url = tab === 'cases' ? '/api/cases/tags' : '/api/qa/tags';
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const cloud = document.getElementById('caseTagCloud');
+    if (!data.success) { cloud.innerHTML = ''; return; }
+    cloud.innerHTML = data.tags.slice(0, 30).map(t => `
+      <span onclick="filterCaseByTag('${escAttr(t.name)}')"
+        style="cursor:pointer;padding:3px 10px;border-radius:20px;font-size:12px;border:1px solid ${casesState.tag===t.name?'var(--accent)':'var(--border)'};background:${casesState.tag===t.name?'rgba(108,99,255,.15)':'var(--surface)'};color:${casesState.tag===t.name?'var(--accent2)':'var(--text-muted)'}">
+        ${escHtml(t.name)} <span style="opacity:.6">${t.count}</span>
+      </span>
+    `).join('');
+    casesState.tagsLoaded[tab] = true;
+  } catch(e) {}
+}
+
+async function fetchCasesOrQa() {
+  const grid = document.getElementById('casesGrid');
+  const total = document.getElementById('casesTotal');
+  grid.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px">加载中...</div>';
+  total.textContent = '';
+
+  const tab = casesState.tab;
+  const params = new URLSearchParams({
+    limit: 20,
+    page: casesState.page,
+    ...(casesState.tag ? { tag: casesState.tag } : {}),
+    ...(casesState.search ? { search: casesState.search } : {}),
+    ...(tab === 'cases' && !casesState.tag && !casesState.search ? { featured: 'true' } : {}),
+  });
+
+  const url = tab === 'cases' ? `/api/cases?${params}` : `/api/qa?${params}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.success) { grid.innerHTML = `<div style="color:var(--error)">${escHtml(data.error||'加载失败')}</div>`; return; }
+    total.textContent = `共 ${data.total} 条${casesState.tag?'（已筛选）':''}`;
+    if (tab === 'cases') renderCaseCards(data.results);
+    else renderQaCards(data.results);
+    renderCasesPagination(data.total, data.page, 20);
+  } catch(e) {
+    grid.innerHTML = '<div style="color:var(--error)">网络错误</div>';
+  }
+}
+
+function renderCaseCards(results) {
+  const grid = document.getElementById('casesGrid');
+  if (!results.length) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px">暂无结果</div>'; return; }
+  grid.innerHTML = results.map(c => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px">
+      ${c.is_featured ? '<span style="font-size:11px;background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:1px 7px;font-weight:600;display:inline-block;margin-bottom:2px">🔥 热门</span>' : ''}
+      <div style="font-weight:600;font-size:14px;line-height:1.4;color:var(--text)">${escHtml(c.title)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${(c.tags||[]).map(t => `<span style="font-size:11px;padding:2px 7px;border-radius:12px;background:rgba(108,99,255,.1);color:var(--accent2);border:1px solid rgba(108,99,255,.2)">${escHtml(t)}</span>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;max-height:72px;overflow:hidden">${escHtml((c.description_preview||'').replace(/\\n/g,' ').replace(/\n/g,' ').slice(0,150))}…</div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick="caseToStoryboard(${c.id})">🎬 一键生成分镜</button>
+        <button class="btn btn-ghost btn-sm" onclick="viewCaseDetail(${c.id})">查看详情</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderQaCards(results) {
+  const grid = document.getElementById('casesGrid');
+  if (!results.length) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px">暂无结果</div>'; return; }
+  grid.innerHTML = results.map(q => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-weight:600;font-size:14px;line-height:1.4;color:var(--text)">${escHtml(q.title)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${(q.tags||[]).map(t => `<span style="font-size:11px;padding:2px 7px;border-radius:12px;background:rgba(16,185,129,.1);color:var(--success);border:1px solid rgba(16,185,129,.2)">${escHtml(t)}</span>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6;max-height:72px;overflow:hidden">${escHtml((q.content_preview||'').replace(/\\n/g,' ').replace(/\n/g,' ').replace(/#+\s*/g,'').slice(0,150))}…</div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick="qaToStoryboard(${q.id})">🎬 一键生成分镜</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderCasesPagination(total, page, limit) {
+  const pages = Math.ceil(total / limit);
+  if (pages <= 1) { document.getElementById('casesPagination').innerHTML = ''; return; }
+  const start = Math.max(1, page - 2);
+  const end   = Math.min(pages, page + 2);
+  let btns = '';
+  if (start > 1) btns += `<button class="btn btn-secondary btn-sm" onclick="goCasePage(1)">1</button>${start>2?'<span style="color:var(--text-muted)">…</span>':''}`;
+  for (let i = start; i <= end; i++) {
+    btns += `<button class="btn ${i===page?'btn-primary':'btn-secondary'} btn-sm" onclick="goCasePage(${i})">${i}</button>`;
+  }
+  if (end < pages) btns += `${end<pages-1?'<span style="color:var(--text-muted)">…</span>':''}<button class="btn btn-secondary btn-sm" onclick="goCasePage(${pages})">${pages}</button>`;
+  document.getElementById('casesPagination').innerHTML = btns;
+}
+
+function goCasePage(p) {
+  casesState.page = p;
+  fetchCasesOrQa();
+  document.getElementById('casesGrid').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+async function caseToStoryboard(caseId) {
+  showToast('加载案例中...');
+  try {
+    const res = await fetch(`/api/cases/${caseId}`);
+    const data = await res.json();
+    if (!data.success) { showToast('加载失败', 'error'); return; }
+    const c = data.data;
+
+    // Build storyboard concept from case fields
+    const kp = Array.isArray(c.key_points) ? c.key_points : (typeof c.key_points === 'string' ? JSON.parse(c.key_points||'[]') : []);
+    const concept = [
+      c.title,
+      c.insurance_needs ? c.insurance_needs.slice(0,200).replace(/\n/g,' ') : '',
+      c.description ? '【核心方案】' + c.description.slice(0,300).replace(/\n/g,' ') : '',
+    ].filter(Boolean).join('\n\n');
+
+    document.getElementById('sbConcept').value = concept.slice(0, 600);
+    document.getElementById('sbGoal').value = 'brand storytelling, emotional connection';
+    document.getElementById('sbTone').value = 'cinematic and emotional';
+    document.getElementById('sbMessages').value = kp.length ? kp.slice(0,3).join('、') : (c.budget_suggestion || c.title);
+    document.getElementById('sbStructure').value = 'qczh';
+    onStructureChange();
+    document.getElementById('sbShotCount').value = '4';
+    document.getElementById('sbAudience').value = c.family_structure || '高净值人士及家庭';
+
+    switchPage('storyboard');
+    showToast('✅ 案例已填入，可直接生成分镜！');
+  } catch(e) {
+    showToast('加载失败', 'error');
+  }
+}
+
+async function qaToStoryboard(qaId) {
+  showToast('加载问答中...');
+  try {
+    const res = await fetch(`/api/qa/${qaId}`);
+    const data = await res.json();
+    if (!data.success) { showToast('加载失败', 'error'); return; }
+    const q = data.data;
+
+    const concept = `${q.title}\n\n${(q.content||'').slice(0,400).replace(/#+\s*/g,'').replace(/\n{2,}/g,'\n')}`;
+    document.getElementById('sbConcept').value = concept.slice(0, 600);
+    document.getElementById('sbGoal').value = 'brand storytelling, emotional connection';
+    document.getElementById('sbTone').value = 'cinematic and emotional';
+    document.getElementById('sbMessages').value = q.title.slice(0, 80);
+    document.getElementById('sbStructure').value = 'qczh';
+    onStructureChange();
+    document.getElementById('sbShotCount').value = '4';
+    document.getElementById('sbAudience').value = '内地赴港投保客户';
+
+    switchPage('storyboard');
+    showToast('✅ 问答已填入，可直接生成分镜！');
+  } catch(e) {
+    showToast('加载失败', 'error');
+  }
+}
+
+async function viewCaseDetail(caseId) {
+  try {
+    const res = await fetch(`/api/cases/${caseId}`);
+    const data = await res.json();
+    if (!data.success) return;
+    const c = data.data;
+    const kp = Array.isArray(c.key_points) ? c.key_points : (typeof c.key_points === 'string' ? JSON.parse(c.key_points||'[]') : []);
+    const body = [
+      `<h3 style="margin:0 0 10px;font-size:15px">${escHtml(c.title)}</h3>`,
+      c.family_structure ? `<p style="font-size:12px;color:var(--text-muted)">家庭结构：${escHtml(c.family_structure)}</p>` : '',
+      c.insurance_needs ? `<div style="font-size:13px;margin-bottom:10px;max-height:150px;overflow-y:auto">${escHtml(c.insurance_needs)}</div>` : '',
+      kp.length ? `<div style="font-size:12px;margin-bottom:8px"><strong>要点：</strong>${kp.map(k=>`<span style="display:inline-block;background:rgba(108,99,255,.1);border-radius:4px;padding:1px 7px;margin:2px;font-size:11px">${escHtml(k)}</span>`).join('')}</div>` : '',
+      `<div style="font-size:12px;color:var(--text-muted);max-height:180px;overflow-y:auto">${escHtml((c.description||c.content||'').slice(0,800))}</div>`,
+      `<div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="caseToStoryboard(${c.id});document.getElementById('caseModal').remove()">🎬 生成分镜</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('caseModal').remove()">关闭</button>
+      </div>`
+    ].join('');
+    let modal = document.getElementById('caseModal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'caseModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto">${body}</div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+  } catch(e) {}
+}
 
 // Set initial page display
 document.getElementById('page-generate').style.display = 'flex';
